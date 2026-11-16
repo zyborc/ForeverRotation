@@ -58,6 +58,16 @@ local function applyShape(b, round)
         setMasked(b, tex, round)
     end
     b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    -- Tastenplakette: bei runden Icons unten innen (die Ecken sind abgeschnitten),
+    -- bei eckigen oben rechts, bei Timeline-Icons darunter.
+    b.key:ClearAllPoints()
+    if b.keyBelow then
+        b.key:SetPoint("TOP", b, "BOTTOM", 0, -2)
+    elseif round then
+        b.key:SetPoint("BOTTOM", b, "BOTTOM", 0, math.max(2, math.floor(b.size * 0.06)))
+    else
+        b.key:SetPoint("TOPRIGHT", b, "TOPRIGHT", -2, -2)
+    end
     if round then
         b.cd:SetSwipeTexture(ROUND_MASK)
         if b.cd.SetUseCircularEdge then b.cd:SetUseCircularEdge(true) end
@@ -77,6 +87,8 @@ local function createIcon(parent, size, opts)
     opts = opts or {}
     local b = CreateFrame("Frame", nil, parent)
     b:SetSize(size, size)
+    b.size = size
+    b.keyBelow = opts.keyBelow
 
     b.shadow = b:CreateTexture(nil, "BACKGROUND", nil, -3)
     b.shadow:SetPoint("TOPLEFT", -BORDER - 3, BORDER + 3)
@@ -129,12 +141,13 @@ local function createIcon(parent, size, opts)
 
     b.key = b.textLayer:CreateFontString(nil, "OVERLAY")
     b.key:SetFont(FONT, math.max(8, math.floor(size * 0.22)), "OUTLINE")
-    if opts.keyBelow then
-        b.key:SetPoint("TOP", b, "BOTTOM", 0, -2)
-    else
-        b.key:SetPoint("TOPRIGHT", 0, -2)
-    end
     b.key:SetTextColor(1, 1, 1)
+    -- dunkle Plakette hinter der Taste, damit sie auf hellen Icons lesbar bleibt
+    b.keyBg = b.textLayer:CreateTexture(nil, "ARTWORK")
+    b.keyBg:SetColorTexture(0, 0, 0, 0.55)
+    b.keyBg:SetPoint("TOPLEFT", b.key, "TOPLEFT", -3, 1)
+    b.keyBg:SetPoint("BOTTOMRIGHT", b.key, "BOTTOMRIGHT", 3, -1)
+    b.keyBg:Hide()
 
     b.pop = b:CreateAnimationGroup()
     local scale = b.pop:CreateAnimation("Scale")
@@ -155,6 +168,12 @@ local function createIcon(parent, size, opts)
     return b
 end
 
+-- Taste setzen; Plakette nur mit Text zeigen
+local function setKey(b, text)
+    b.key:SetText(text or "")
+    b.keyBg:SetShown(text ~= nil and text ~= "")
+end
+
 ---------------------------------------------------------------------------
 -- Timeline
 ---------------------------------------------------------------------------
@@ -173,6 +192,19 @@ local function createTimeline(parent)
     tl.edgeBottom = tl:CreateTexture(nil, "BORDER")
     tl.edgeBottom:SetPoint("BOTTOMLEFT"); tl.edgeBottom:SetPoint("BOTTOMRIGHT"); tl.edgeBottom:SetHeight(1)
     tl.edgeBottom:SetColorTexture(1, 1, 1, 0.08)
+
+    -- weicher Übergang am linken Rand: in der Zeile gleiten die Zauber ins große Icon
+    tl.fade = tl:CreateTexture(nil, "BORDER")
+    tl.fade:SetPoint("TOPLEFT")
+    tl.fade:SetPoint("BOTTOMLEFT")
+    tl.fade:SetWidth(TL_ICON)
+    tl.fade:SetTexture(WHITE)
+    local okGrad = CreateColor and pcall(tl.fade.SetGradient, tl.fade, "HORIZONTAL",
+        CreateColor(0, 0, 0, 0.55), CreateColor(0, 0, 0, 0))
+    if not okGrad and tl.fade.SetGradientAlpha then
+        okGrad = pcall(tl.fade.SetGradientAlpha, tl.fade, "HORIZONTAL", 0, 0, 0, 0.55, 0, 0, 0, 0)
+    end
+    if not okGrad then tl.fade:Hide() end
 
     -- "Jetzt"-Linie links (Klassenfarbe)
     tl.nowLine = tl:CreateTexture(nil, "OVERLAY")
@@ -281,6 +313,18 @@ local function createProcAlert(f)
     return a
 end
 
+-- Kurzinfo unter der Anzeige: unter der Timeline, wenn die darunter liegt, sonst unter dem Icon.
+local function anchorToast(f)
+    local t = f.toast
+    if not t then return end
+    t:ClearAllPoints()
+    if ns.db.global.timeline and ns.db.global.timelinePos == "below" then
+        t:SetPoint("TOPLEFT", f.timeline, "BOTTOMLEFT", 0, -6)
+    else
+        t:SetPoint("TOPLEFT", f.main, "BOTTOMLEFT", -BORDER, -24)
+    end
+end
+
 -- Kurzinfo unter der Anzeige (z. B. Coach-Ergebnis nach dem Kampf), blendet nach 6 s aus.
 function Display:ShowToast(msg, r, g, b)
     local f = self.frame
@@ -288,7 +332,8 @@ function Display:ShowToast(msg, r, g, b)
     if not f.toast then
         local t = CreateFrame("Frame", nil, f)
         t:SetSize(300, 18)
-        t:SetPoint("TOPLEFT", f.main, "BOTTOMLEFT", -BORDER, -24)
+        f.toast = t
+        anchorToast(f)
         t.text = t:CreateFontString(nil, "OVERLAY")
         t.text:SetFont(FONT, 13, "OUTLINE")
         t.text:SetPoint("LEFT")
@@ -303,7 +348,6 @@ function Display:ShowToast(msg, r, g, b)
         fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(0); fadeOut:SetStartDelay(5.5); fadeOut:SetDuration(0.8); fadeOut:SetOrder(2)
         ag:SetScript("OnFinished", function() t:Hide() end)
         t.anim = ag
-        f.toast = t
     end
     local t = f.toast
     t.text:SetText(msg)
@@ -388,6 +432,15 @@ function Display:Init()
         local point, _, relPoint, x, y = frame:GetPoint()
         ns.db.global.pos = { point, relPoint, x, y }
     end)
+    -- entsperrt: Rechtsklick sperrt die Anzeige wieder
+    f:SetScript("OnMouseUp", function(_, button)
+        if button == "RightButton" and not ns.db.global.locked then
+            ns.db.global.locked = true
+            Display:ApplySettings()
+            if ns.Config and ns.Config.Refresh then ns.Config:Refresh() end
+            print(ns.PREFIX .. L["Anzeige fixiert."])
+        end
+    end)
 
     f.main = createIcon(f, MAIN_SIZE, { glow = true })
     f.main:SetPoint("LEFT")
@@ -404,6 +457,12 @@ function Display:Init()
     f.reason = f:CreateFontString(nil, "OVERLAY")
     f.reason:SetFont(FONT, 11, "OUTLINE")
     f.reason:SetPoint("TOPLEFT", f.main, "BOTTOMLEFT", -BORDER, -7)
+    -- dunkler Streifen hinter der Begründung (lesbar auch vor hellem Boden)
+    f.reasonBg = f:CreateTexture(nil, "BACKGROUND", nil, -4)
+    f.reasonBg:SetColorTexture(0, 0, 0, 0.45)
+    f.reasonBg:SetPoint("TOPLEFT", f.reason, "TOPLEFT", -4, 2)
+    f.reasonBg:SetPoint("BOTTOMRIGHT", f.reason, "BOTTOMRIGHT", 4, -2)
+    f.reasonBg:Hide()
 
     f.timeline = createTimeline(f)
 
@@ -416,7 +475,7 @@ function Display:Init()
     f.remind:SetPoint("BOTTOMLEFT", f.main, "TOPLEFT", -BORDER, 8)
     f.remind:SetJustifyH("LEFT")
     f.remind:SetTextColor(1, 0.85, 0.4)
-    f.handle:SetText(L["ForeverRotation – ziehen, dann sperren"])
+    f.handle:SetText(L["ForeverRotation – ziehen · Rechtsklick sperrt"])
 
     f.unlockBg = f:CreateTexture(nil, "BACKGROUND", nil, -5)
     f.unlockBg:SetColorTexture(0.1, 0.8, 0.2, 0.25)
@@ -460,7 +519,9 @@ function Display:ApplySettings()
         f:SetSize(MAIN_SIZE + NEXT_SIZE + 14, MAIN_SIZE)
     end
     f.timeline.nowLine:SetShown(not inRow)
+    f.timeline.fade:SetShown(inRow)
     self.inRow = inRow
+    anchorToast(f)
 
     -- grüner Greifbereich deckt Icons und (falls an) Timeline ab
     f.unlockBg:ClearAllPoints()
@@ -555,7 +616,7 @@ local function setIcon(b, rule, ready, noMana, s, isMain)
     end
     local name = rule.spell
     setSpell(b, name)
-    b.key:SetText(ns:KeyFor(name) or "")
+    setKey(b, ns:KeyFor(name))
 
     local waiting = ready and ready > 0.1
     b.timer:SetText(waiting and string.format(ready < 10 and "%.1f" or "%d", ready) or "")
@@ -581,7 +642,7 @@ local function showIdle(b)
     b.tint:Hide()
     setSwipe(b, nil)
     b.timer:SetText("")
-    b.key:SetText("")
+    setKey(b, nil)
     setGlow(b, false)
     b:Show()
 end
@@ -597,19 +658,21 @@ local function showEmpty(b, seconds)
     setSwipe(b, nil)
     b.timer:SetText(seconds and string.format(seconds < 10 and "%.1f" or "%d", seconds) or "")
     b.timer:SetTextColor(0.75, 0.75, 0.75)
-    b.key:SetText("")
+    setKey(b, nil)
     setGlow(b, false)
     b:Show()
 end
 
 local function showPreview(b, text)
-    b.spell = nil
-    b.icon:SetTexture(134400) -- Fragezeichen
+    if b.spell ~= "__preview" then
+        b.spell = "__preview"
+        b.icon:SetTexture(134400) -- Fragezeichen
+    end
     b.icon:SetDesaturated(false)
     b.tint:Hide()
     setSwipe(b, nil)
     b.timer:SetText("")
-    b.key:SetText(text or "")
+    setKey(b, text)
     setGlow(b, false)
     b:Show()
 end
@@ -634,7 +697,7 @@ local function updateTimeline(tl, s, g, skipFirst)
         b:ClearAllPoints()
         b:SetPoint("LEFT", tl, "LEFT", x, 0)
         setSpell(b, p.rule.spell)
-        b.key:SetText(ns:KeyFor(p.rule.spell) or "")
+        setKey(b, ns:KeyFor(p.rule.spell))
         b.timer:SetText("")
         b.icon:SetDesaturated(false)
         setTint(b, p.noMana, nil)
@@ -652,9 +715,15 @@ end
 -- Sichtbarkeit: wann die Anzeige erscheint
 ---------------------------------------------------------------------------
 
+-- Vorschau: solange das Einstellungsfenster den Reiter "Anzeige" zeigt, bleibt die
+-- Anzeige sichtbar, damit jede Änderung sofort zu sehen ist.
+function Display:PreviewActive()
+    return ns.Config and ns.Config.PreviewActive and ns.Config:PreviewActive() or false
+end
+
 function Display:ShouldShow(s)
     local g = ns.db.global
-    if not g.locked then return true end
+    if not g.locked or self:PreviewActive() then return true end
     if g.hideMounted and ns.safe(IsMounted) then return false end
     if g.hideVehicle and (ns.safe(UnitHasVehicleUI, "player") or ns.safe(UnitInVehicle, "player")) then return false end
     if ns.safe(UnitIsDeadOrGhost, "player") then return false end
@@ -718,15 +787,18 @@ function Display:Update()
 
     local s = ns:Snapshot()
     self:UpdateReminders(s)
+    local preview = self:PreviewActive()
     if not self:ShouldShow(s) then
         setIcon(f.main, nil); setIcon(f.next, nil)
         f.arrow:Hide()
         f.reason:SetText("")
+        f.reasonBg:Hide()
         f.timeline:Hide()
+        self.currentRule, self.currentReady = nil, false
         if ns.ActionGlow then ns.ActionGlow:Update(nil) end
         return
     end
-    f:SetAlpha((s.inCombat or not g.locked) and 1 or (g.alphaOOC or 0.6))
+    f:SetAlpha((s.inCombat or not g.locked or preview) and 1 or (g.alphaOOC or 0.6))
 
     local rule, ready, noMana = ns:Recommend(s)
 
@@ -737,6 +809,7 @@ function Display:Update()
     --   "empty" = dunkler Kreis + Countdown, "auto" = Autoangriff
     local idleMode = g.idleMode or "spell"
     local readyNow = rule and ready <= s.gcdRemain + 0.3
+    self.currentRule, self.currentReady = rule, readyNow   -- für den Prioritäten-Reiter
     if ns.ActionGlow then
         ns.ActionGlow:Update(rule, readyNow, noMana, rule and s.inRange(rule.spell) == false)
     end
@@ -758,16 +831,22 @@ function Display:Update()
     end
     setIcon(f.next, nextRule, nextReady, nextNoMana, s, false)
 
-    if not g.locked then
+    if not g.locked or preview then
         if not rule then showPreview(f.main, L["jetzt"]) end
         if wantNext and not nextRule then showPreview(f.next, L["dann"]) end
     end
     f.arrow:SetShown(f.next:IsShown())
+    local reason
     if mainWaiting and idleMode ~= "spell" then
-        f.reason:SetText((g.showReason and idleMode == "auto") and L["Autoangriff"] or "")
+        reason = (g.showReason and idleMode == "auto") and L["Autoangriff"] or ""
     else
-        f.reason:SetText((g.showReason and rule and rule.reason and ns:T(rule.reason, rule.spell)) or "")
+        reason = (g.showReason and rule and rule.reason and ns:T(rule.reason, rule.spell)) or ""
+        if reason == "" and g.showReason and not rule and (not g.locked or preview) then
+            reason = L["Begründung erscheint hier"]
+        end
     end
+    f.reason:SetText(reason)
+    f.reasonBg:SetShown(reason ~= "")
 
     if g.timeline then
         f.timeline:Show()

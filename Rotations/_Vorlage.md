@@ -29,8 +29,9 @@ ns:RegisterRotation({
 
     extraSpells = {},              -- Zauber, die nur in Bedingungen vorkommen (für s.known)
 
-    -- Optionen erscheinen automatisch im Konfigurationsfenster (/frot):
-    --   boolean -> Häkchen, Zahl mit min/max/step -> Minus/Plus, values -> Umschalt-Knopf
+    -- Optionen erscheinen automatisch im Konfigurationsfenster (/frot, Reiter Rotation):
+    --   boolean -> Häkchen, Zahl mit min/max/step -> Schieberegler, values -> Auswahlliste
+    --   `desc` steht als graue Erklärung unter der Beschriftung (und im Tooltip)
     options = {
         aoe   = { order = 1, default = 3, min = 1, max = 8, step = 1,
                   label = "Whirlwind ab Gegnern", desc = "Tooltip-Text" },
@@ -68,8 +69,9 @@ ns:RegisterRotation({
 
 ## Prioritäten-Editor
 
-`/frot` → „Prioritäten bearbeiten“ (oder `/frot prio`): Einträge per Pfeil verschieben, per Häkchen
-abschalten, gespeichert pro Rotation in `db.rulePrefs`. Eintrag = Regel oder Gruppe (`group`).
+`/frot` → Reiter „Prioritäten“ (oder `/frot prio`, Strg-Klick auf das Minimap-Symbol): Einträge per
+Pfeil oder mit der Maus ziehen, per Häkchen abschalten, gespeichert pro Rotation in `db.rulePrefs`.
+Die gerade empfohlene Regel ist im Reiter hervorgehoben. Eintrag = Regel oder Gruppe (`group`).
 Anzeigename: `groupLabel` > `label` > „Zauber – reason“. Kommen nach einem Update neue Regeln dazu,
 landen sie hinter ihrem Vorgänger aus der Standardreihenfolge. Schlüssel einer Regel:
 `group` > `id` > Zauber + reason – also `reason` nicht ohne Grund umbenennen, sonst geht die
