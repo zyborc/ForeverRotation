@@ -540,3 +540,66 @@ add({
     ["Mit dem Talent Eclipse: {1} lädt auf, dann zwei {2} mit kürzerer Zauberzeit."] = "With the Eclipse talent: {1} charges, then two {2} with a shorter cast time.",
     ["Mana zurück über {1} mit {2} – lohnt, wenn du ein Ziel in Reichweite hast."] = "Mana back via {1} with {2} – worth it when you have a target in range.",
 })
+
+---------------------------------------------------------------------------
+-- Fable: GUI-Überarbeitung (Einstellungsfenster, Prioritäten-Reiter, Hilfe, Willkommen)
+---------------------------------------------------------------------------
+add({
+    -- Fenster
+    ["Prioritäten"] = "Priorities",
+    ["Hilfe"] = "Help",
+    ["%s · Rolle %s (%s)"] = "%s · role %s (%s)",
+    ["Änderungen gelten sofort · /frot help"] = "Changes apply immediately · /frot help",
+    ["Anzeige verschieben"] = "Move display",
+    ["Anzeige sperren"] = "Lock display",
+    ["Solange dieser Reiter offen ist, bleibt die Anzeige sichtbar – jede Änderung ist sofort zu sehen."] = "While this tab is open the display stays visible, so every change shows immediately.",
+    ["Entsperrt lässt sich die Anzeige mit der Maus verschieben. Rechtsklick auf die Anzeige sperrt sie wieder."] = "When unlocked, the display can be moved with the mouse. Right-click the display to lock it again.",
+    ["Linksklick öffnet dieses Fenster, Shift-Klick den Coach, Rechtsklick sperrt/entsperrt die Anzeige. Am Rand entlang ziehbar."] = "Left-click opens this window, shift-click the coach, right-click locks/unlocks the display. Drag it along the edge.",
+    ["Setzt die Anzeige zurück in die Bildschirmmitte."] = "Moves the display back to the center of the screen.",
+    ["Zeigt, was nach dem aktuellen Zauber kommt (nur bei Timeline darunter oder ohne Timeline)."] = "Shows what comes after the current spell (only with the timeline below, or without a timeline).",
+    ["Diese Rotation hat keine Optionen."] = "This rotation has no options.",
+    ["Löscht alle gespeicherten Kämpfe."] = "Deletes all stored fights.",
+
+    -- Prioritäten
+    ["Oben = wichtiger. Es wird die erste Regel empfohlen, deren Bedingung passt und die (fast) bereit ist. Grau = noch nicht gelernt. Die gerade empfohlene Regel ist hervorgehoben."] = "Top = more important. The first rule whose condition matches and that is (almost) ready is recommended. Grey = not learned yet. The rule currently recommended is highlighted.",
+    ["Ziehen oder Pfeile: Reihenfolge ändern · Häkchen: Regel an/aus"] = "Drag or arrows: change the order · checkbox: rule on/off",
+    ["Setzt Reihenfolge und Häkchen dieser Rotation zurück."] = "Resets the order and the checkboxes of this rotation.",
+    ["Strg-Klick: Prioritäten"] = "Ctrl-click: priorities",
+    ["Empfehlung: "] = "Recommendation: ",
+
+    -- Anzeige
+    ["Begründung erscheint hier"] = "The reason appears here",
+    ["ForeverRotation – ziehen · Rechtsklick sperrt"] = "ForeverRotation – drag · right-click locks",
+
+    -- Hilfe
+    ["Erste Schritte"] = "Getting started",
+    ["Die Anzeige erscheint, sobald du ein Ziel hast oder im Kampf bist. ForeverRotation schlägt nur vor – gedrückt wird wie gewohnt auf der Aktionsleiste."] = "The display appears as soon as you have a target or are in combat. ForeverRotation only suggests – you press your action bar as usual.",
+    ["Großes Icon"] = "Big icon",
+    ["Der Zauber, der jetzt dran ist. Leuchtet es golden, drücken. Grau mit Zahl = kommt in so vielen Sekunden."] = "The spell that is up now. When it glows golden, press it. Grey with a number = ready in that many seconds.",
+    ["Die vorhergesagten nächsten Zauber. Sie gleiten von rechts in das große Icon hinein."] = "The predicted next spells. They slide from the right into the big icon.",
+    ["Taste im Icon"] = "Key in the icon",
+    ["Die Taste, auf der der Zauber liegt – von deiner Aktionsleiste gelesen."] = "The key the spell is bound to – read from your action bar.",
+    ["Blau eingefärbt"] = "Tinted blue",
+    ["Zu wenig Mana für diesen Zauber."] = "Not enough mana for this spell.",
+    ["Rot eingefärbt"] = "Tinted red",
+    ["Ziel außer Reichweite."] = "Target out of range.",
+    ["Text darunter"] = "Text below",
+    ["Die Begründung: warum gerade dieser Zauber."] = "The reason: why this spell right now.",
+    ["Der empfohlene Knopf wird zusätzlich eingerahmt (Reiter Hinweise)."] = "The recommended button is framed on the action bar as well (Alerts tab).",
+    ["Entsperrt die Anzeige: mit der Maus ziehen, Rechtsklick sperrt wieder."] = "Unlocks the display: drag it with the mouse, right-click locks it again.",
+    ["Prioritäten ansehen"] = "View priorities",
+    ["Zeigt die Regeln der aktiven Rotation."] = "Shows the rules of the active rotation.",
+    ["Warum ist die Anzeige im Kampf manchmal ungenau?"] = "Why is the display sometimes off in combat?",
+    ["WoW Forever versteckt im Kampf Cooldowns, Auren und Mana vor Addons. ForeverRotation zählt deine eigenen Zauber mit und rechnet daraus Cooldowns und Buffs hoch; außerhalb des Kampfs wird gegen die echten Werte abgeglichen. Restzeiten können daher im Kampf um ein paar Zehntel abweichen, und ein Siegel, das z. B. durch einen Tod verloren ging, fällt erst nach dem Kampf auf."] = "In combat, WoW Forever hides cooldowns, auras and mana from addons. ForeverRotation tracks your own casts and derives cooldowns and buffs from them; out of combat everything is synced with the real values. Remaining times can therefore be off by a few tenths in combat, and a seal lost e.g. through death is only noticed after combat.",
+    ["Lebens- und Manawerte liest das Addon nie – „zu wenig Mana“ und „unter 20 %“ kommen direkt aus der Nutzbarkeit des Zaubers, die das Spiel freigibt."] = "The addon never reads health or mana values – “not enough mana” and “below 20%” come straight from the spell usability the game exposes.",
+    ["Rolle und Rotation"] = "Role and rotation",
+    ["Welche Rotation gilt, entscheidet die Rolle, nicht der Talentbaum: Gruppenrolle, sonst ein Rollen-Buff (z. B. {Righteous Fury} = Tank), sonst Schaden. Im Reiter Rotation lässt sich die Rolle auch fest einstellen."] = "The role decides which rotation applies, not the talent tree: group role, otherwise a role buff (e.g. {Righteous Fury} = tank), otherwise damage. The Rotation tab also lets you set the role by hand.",
+    ["ForeverRotation %s · WoW Forever · Interface %s"] = "ForeverRotation %s · WoW Forever · Interface %s",
+
+    -- Willkommen / Blizzard-Einstellungen
+    ["Willkommen bei ForeverRotation!"] = "Welcome to ForeverRotation!",
+    ["Die Anzeige erscheint, sobald du ein Ziel hast oder im Kampf bist. Das große Icon ist der Zauber, der jetzt dran ist; die Timeline zeigt, was danach kommt. Gedrückt wird wie gewohnt auf deiner Aktionsleiste.\n\nTipp: Verschiebe die Anzeige zuerst an eine gut sichtbare Stelle."] = "The display appears as soon as you have a target or are in combat. The big icon is the spell that is up now; the timeline shows what comes next. You press your action bar as usual.\n\nTip: first move the display to a spot you can see well.",
+    ["Später"] = "Later",
+    ["Rotationshelfer für WoW Forever. Zeigt den nächsten Zauber an, ohne geheime Werte zu lesen. Alle Einstellungen liegen im eigenen Fenster (/frot)."] = "Rotation helper for WoW Forever. Shows the next spell without reading secret values. All settings live in the addon's own window (/frot).",
+    ["Einstellungen öffnen"] = "Open settings",
+})

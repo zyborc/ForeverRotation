@@ -93,6 +93,7 @@ end
 -- Fehlt eine Übersetzung, wird eine Vorlage gesucht: "{Battle Shout} halten" -> "{1} halten".
 function ns:T(text, spell)
     if text == nil then return nil end
+    text = tostring(text)
     local out = rawget(L, text)
     if not out and text:find("{", 1, true) then
         local tokens, n = {}, 0
@@ -519,9 +520,10 @@ local function initDB()
     db.rotationOpts = db.rotationOpts or {}
     db.learnedCD = db.learnedCD or {}
     db.selected = db.selected or {}   -- ["Name-Realm|ROLLE"] = Rotations-ID
-    db.roleMode = db.roleMode or {}
-    db.rulePrefs = db.rulePrefs or {} -- [Rotations-ID] = { order = {Schlüssel...}, disabled = {[Schlüssel] = true} }   -- ["Name-Realm"] = "TANK" | "DAMAGER" | "HEALER" (fehlt = auto)
+    db.roleMode = db.roleMode or {}   -- ["Name-Realm"] = "TANK" | "DAMAGER" | "HEALER" (fehlt = auto)
+    db.rulePrefs = db.rulePrefs or {} -- [Rotations-ID] = { order = {Schlüssel...}, disabled = {[Schlüssel] = true} }
     db.coach = db.coach or { history = {} }   -- Coach: letzte Kämpfe
+    db.coach.history = db.coach.history or {} -- Schutz vor einer unvollständigen Datei
     db.opts = nil -- Altlast aus 0.1.0
     -- 0.5: alte Standard-Vorschau von 6 s war für Classic-Rotationen zu kurz
     if not db.global.migrated05 then
@@ -553,6 +555,7 @@ end
 
 function ns:SetOpt(name, value)
     local def = self.rotation
+    if not def then return end
     self.db.rotationOpts[def.id] = self.db.rotationOpts[def.id] or {}
     self.db.rotationOpts[def.id][name] = value
 end
@@ -1440,6 +1443,8 @@ SlashCmdList.FOREVERROTATION = function(msg)
         ns:StartCastLog(tonumber(arg) or 60)
     elseif cmd == "prio" and ns.Priorities then
         ns.Priorities:Toggle()
+    elseif cmd == "help" then
+        printHelp()
     elseif cmd == "minimap" then
         g.minimap = not g.minimap
         if ns.MinimapButton then ns.MinimapButton:Apply() end
