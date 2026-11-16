@@ -220,6 +220,8 @@ add({
     ["automatisch = {Seal of Command}, sobald gelernt, sonst {Seal of Righteousness}"] = "automatic = {Seal of Command} once learned, otherwise {Seal of Righteousness}",
     ["Kreuzfahrer-Opener gegen Elites"] = "Crusader opener against elites",
     ["{Seal of the Crusader} setzen und richten, dann Schadenssiegel"] = "Cast and judge {Seal of the Crusader}, then the damage seal",
+    ["Kein Kreuzfahrer-Opener bei Gruppen"] = "No Crusader opener on packs",
+    ["Kämpfst du gegen so viele Gegner wie bei {Consecration} eingestellt, wird der Opener übersprungen und gleich das Schadenssiegel empfohlen."] = "When you fight at least as many enemies as set for {Consecration}, the opener is skipped and the damage seal is recommended right away.",
     ["{Consecration} ab Gegnern"] = "{Consecration} from enemies",
     ["Anzahl Gegner im Kampf in Nahkampfreichweite"] = "Number of enemies in combat within melee range",
     ["{Holy Shock} nutzen"] = "Use {Holy Shock}",

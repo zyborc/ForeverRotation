@@ -215,6 +215,7 @@ end
 local function openerPending(s)
     return s.opt("crusader") and s.hasTarget and s.targetElite
         and s.known("Seal of the Crusader") and not crusaderDone(s)
+        and not (s.opt("crusaderAoe") and s.enemies >= s.opt("aoe"))
 end
 
 -- Seal Twisting mit Unsealed Wrath (Forever, 31er-Vergeltungstalent):
@@ -322,6 +323,8 @@ ns:RegisterRotation({
                      desc = "automatisch = {Seal of Command}, sobald gelernt, sonst {Seal of Righteousness}" },
         crusader = { order = 2, default = true, label = "Kreuzfahrer-Opener gegen Elites",
                      desc = "{Seal of the Crusader} setzen und richten, dann Schadenssiegel" },
+        crusaderAoe = { order = 2.5, default = true, label = "Kein Kreuzfahrer-Opener bei Gruppen",
+                        desc = "Kämpfst du gegen so viele Gegner wie bei {Consecration} eingestellt, wird der Opener übersprungen und gleich das Schadenssiegel empfohlen." },
         aoe      = { order = 3, default = 2, min = 1, max = 8, step = 1, label = "{Consecration} ab Gegnern",
                      desc = "Anzahl Gegner im Kampf in Nahkampfreichweite" },
         holyShock = { order = 4, default = false, label = "{Holy Shock} nutzen",
