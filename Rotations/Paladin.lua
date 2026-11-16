@@ -190,10 +190,31 @@ local function damageSeal(s)
     return "Seal of Righteousness"
 end
 
+-- Kreuzfahrer-Opener: pro Ziel (GUID) gemerkt, solange der Kampf läuft – Zielwechsel hin und
+-- zurück startet ihn also nicht neu. Außerhalb des Kampfs ist der Debuff selbst lesbar
+-- (auch von anderen Paladinen); im Kampf wirft die Aura-Abfrage, dann zählt nur die eigene Zählung.
+local JOTC_ID = 21183   -- Judgement of the Crusader (Debuff)
+
+local function targetKey()
+    local guid = ns.safe(UnitGUID, "target")
+    return type(guid) == "string" and guid or "target"
+end
+
+local function crusaderOnTarget()
+    if not (C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName) then return false end
+    local name = ns.safe(C_Spell.GetSpellName, JOTC_ID) or "Judgement of the Crusader"
+    return ns.safe(C_UnitAuras.GetAuraDataBySpellName, "target", name, "HARMFUL") ~= nil
+end
+
+local function crusaderDone(s)
+    local done = s.custom.crusaderTargets
+    return (done and done[targetKey()]) or crusaderOnTarget()
+end
+
 -- Kreuzfahrer-Opener steht noch aus?
 local function openerPending(s)
     return s.opt("crusader") and s.hasTarget and s.targetElite
-        and s.known("Seal of the Crusader") and not s.custom.crusaderDone
+        and s.known("Seal of the Crusader") and not crusaderDone(s)
 end
 
 -- Seal Twisting mit Unsealed Wrath (Forever, 31er-Vergeltungstalent):
@@ -316,13 +337,16 @@ ns:RegisterRotation({
     rules = retRules,
 
     hooks = {
-        onReset = function(custom) custom.crusaderDone = false end,
-        onTargetChanged = function(custom) custom.crusaderDone = false end,
+        onReset = function(custom) custom.crusaderTargets = {} end,
         onCast = function(name, s, custom)
             if SEAL_SET[name] then custom.sealSince = s.now end  -- für Twisting
-            -- Judgement mit aktivem Kreuzfahrer-Siegel = Opener erledigt
+            -- Judgement mit aktivem Kreuzfahrer-Siegel = Opener auf diesem Ziel erledigt.
+            -- Neue Tabelle statt Ändern: die Vorhersage kopiert custom nur flach.
             if name == "Judgement" and sealActive(s) == "Seal of the Crusader" then
-                custom.crusaderDone = true
+                local done = {}
+                for k, v in pairs(custom.crusaderTargets or {}) do done[k] = v end
+                done[targetKey()] = true
+                custom.crusaderTargets = done
             end
         end,
     },
