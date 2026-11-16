@@ -262,6 +262,8 @@ add({
     ["Icons im Stil deines Masque-Skins (dann immer eckig). Einstellbar unter /masque."] = "Icons in the style of your Masque skin (always square then). Configure it via /masque.",
     ["Aktionsleiste"] = "Action bar",
     ["Empfehlung auf der Aktionsleiste leuchten lassen"] = "Highlight the recommendation on the action bar",
+    ["Auch im Cooldown-Manager leuchten"] = "Also highlight in the Cooldown Manager",
+    ["Rahmt den Zauber zusätzlich in Blizzards Cooldown-Manager ein (Leisten „Wichtige“ und „Weitere Cooldowns“, im Bearbeitungsmodus einschaltbar)."] = "Also frames the spell in Blizzard's Cooldown Manager (Essential and Utility cooldown bars, enabled in Edit Mode).",
     ["Rahmt den Knopf des empfohlenen Zaubers ein (Blizzard-Leisten, Bartender4, Dominos, ElvUI). Gold = jetzt drücken, blau = zu wenig Mana, rot = außer Reichweite."] = "Frames the button of the recommended spell (Blizzard bars, Bartender4, Dominos, ElvUI). Gold = press now, blue = not enough mana, red = out of range.",
     ["Leuchten ab"] = "Highlight from",
     ["Nur wenn jetzt drücken, oder schon vorher (grau), solange der Zauber noch heranläuft."] = "Only when it's time to press, or earlier (grey) while the spell is still coming up.",

@@ -985,6 +985,9 @@ local function buildHintsTab(b, g)
         function() return g.actionGlowMode or "ready" end,
         function(v) g.actionGlowMode = v end,
         function(v) return v == "always" and "schon vorher (grau)" or "wenn jetzt drücken" end)
+    b:check("Auch im Cooldown-Manager leuchten", "Rahmt den Zauber zusätzlich in Blizzards Cooldown-Manager ein (Leisten „Wichtige“ und „Weitere Cooldowns“, im Bearbeitungsmodus einschaltbar).",
+        function() return g.cooldownGlow ~= false end,
+        function(v) g.cooldownGlow = v; ns.ActionGlow:MarkDirty() end)
 
     b:header("Procs")
     b:check("Proc-Hinweis an der Anzeige", "Text und Aufblitzen über dem großen Icon, z. B. wenn {Seal of Command} auslöst.\nDie Schadenszahlen selbst zeichnet das Spiel, die kann kein Addon einfärben.",

@@ -494,6 +494,7 @@ local GLOBAL_DEFAULTS = {
     minimap = true,       -- Symbol am Rand der Minimap
     actionGlow = true,    -- empfohlenen Zauber auf der Aktionsleiste leuchten lassen
     actionGlowMode = "ready", -- "ready" = nur wenn jetzt drücken, "always" = auch schon vorher (grau)
+    cooldownGlow = true,  -- auch im Blizzard-Cooldown-Manager leuchten lassen
     showWhen = "targetOrCombat", -- "targetOrCombat", "always", "combat", "target"
     hideMounted = true,   -- auf dem Reittier ausblenden
     hideVehicle = true,   -- im Fahrzeug ausblenden

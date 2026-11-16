@@ -1,6 +1,6 @@
 -- ForeverRotation – Aktionsleisten-Leuchten.
 -- Der empfohlene Zauber leuchtet zusätzlich auf deiner Aktionsleiste (Blizzard-Leisten,
--- Bartender4, Dominos, ElvUI). Reine Optik: ein eigener Rahmen wird über den Knopf gelegt,
+-- Bartender4, Dominos, ElvUI) und im Blizzard-Cooldown-Manager. Reine Optik: ein eigener Rahmen wird über den Knopf gelegt,
 -- der Knopf selbst wird nicht verändert (keine Taint-Probleme, auch im Kampf).
 
 local _, ns = ...
@@ -68,16 +68,46 @@ local function spellNameOfSlot(slot)
     return spellID and ns.safe(C_Spell.GetSpellName, spellID)
 end
 
+local function addMapped(name, b)
+    if not name then return end
+    local list = bySpell[name]
+    if not list then list = {}; bySpell[name] = list end
+    for _, x in ipairs(list) do if x == b then return end end
+    list[#list + 1] = b
+end
+
+-- Blizzard-Cooldown-Manager (Edit Mode): wichtige und weitere Cooldowns. Die Buff-Leisten
+-- zeigen Auren, nicht Zauber zum Drücken – die bleiben außen vor.
+local COOLDOWN_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
+
+local function spellNameOfItem(item, method)
+    local fn = item[method]
+    local id = type(fn) == "function" and ns.safe(fn, item)
+    return type(id) == "number" and ns.safe(C_Spell.GetSpellName, id) or nil
+end
+
+local function mapCooldownViewers()
+    for _, vname in ipairs(COOLDOWN_VIEWERS) do
+        local viewer = _G[vname]
+        local items = viewer and type(viewer.GetItemFrames) == "function" and { ns.safe(viewer.GetItemFrames, viewer) }
+        -- GetItemFrames liefert die Kinder als Liste oder einzeln, je nach Version
+        if items and type(items[1]) == "table" and not items[1].GetObjectType then items = items[1] end
+        for _, item in ipairs(items or {}) do
+            if type(item) == "table" and item.GetObjectType then
+                addMapped(spellNameOfItem(item, "GetSpellID"), item)
+                addMapped(spellNameOfItem(item, "GetBaseSpellID"), item)
+            end
+        end
+    end
+end
+
 local function rebuildMap()
     wipe(bySpell)
     for _, b in ipairs(buttons) do
         local slot = slotOf(b)
-        local name = slot and spellNameOfSlot(slot)
-        if name then
-            bySpell[name] = bySpell[name] or {}
-            table.insert(bySpell[name], b)
-        end
+        addMapped(slot and spellNameOfSlot(slot), b)
     end
+    if ns.db.global.cooldownGlow ~= false then mapCooldownViewers() end
     dirty = false
     lastScan = GetTime()
 end
@@ -149,6 +179,10 @@ local function hideGlow(btn)
         gl:Hide()
     end
     lit[btn] = nil
+end
+
+function ActionGlow:MarkDirty()
+    dirty = true
 end
 
 function ActionGlow:Clear()
