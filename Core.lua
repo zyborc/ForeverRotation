@@ -266,11 +266,43 @@ function ns:IsKnownKey(key)
     return (safe(C_SpellBook and C_SpellBook.IsSpellKnown, sid) or safe(IsPlayerSpell, sid)) and true or false
 end
 
+-- Sind Auren gerade gesperrt? Neben dem Kampf auch während Bossbegegnungen, Mythisch+ und PvP
+-- (C_RestrictedActions: 0 Combat, 1 Encounter, 2 ChallengeMode, 3 PvPMatch; 4 Map ist in der
+-- offenen Welt immer aktiv und sperrt Auren nicht).
+local AURA_RESTRICTIONS = { 0, 1, 2, 3 }
+local function aurasRestricted()
+    if InCombatLockdown() then return true end
+    local getState = C_RestrictedActions and C_RestrictedActions.GetAddOnRestrictionState
+    if type(getState) ~= "function" then return false end
+    for _, kind in ipairs(AURA_RESTRICTIONS) do
+        local ok, st = pcall(getState, kind)
+        if ok and not isSecret(st) and type(st) == "number" and st > 0 then return true end
+    end
+    return false
+end
+ns.AurasRestricted = aurasRestricted
+
+-- Eigene Aura lesen: Tabelle = da, false = sicher nicht da, nil = nicht lesbar (dann nichts
+-- überschreiben – "nicht lesbar" ist nicht "fehlt").
+local function readPlayerAura(spellName, filter, restricted)
+    if not (C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName) or not spellName then return nil end
+    local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", spellName, filter)
+    if not ok or isSecret(aura) then return nil end
+    if type(aura) == "table" then
+        if issecrettable and issecrettable(aura) then return nil end
+        return aura
+    end
+    if restricted then return nil end   -- gesperrt: ein leeres Ergebnis beweist nichts
+    return false
+end
+
 -- Außerhalb des Kampfs sind Auren lesbar: Rollen-Buffs prüfen.
 function ns:ScanRoleAuras()
     if InCombatLockdown() then return end
+    local restricted = aurasRestricted()
     for name in pairs(roleAuraNames()) do
-        roleAuraActive[name] = safe(C_UnitAuras.GetAuraDataBySpellName, "player", self:SpellName(name), "HELPFUL") ~= nil
+        local aura = readPlayerAura(self:SpellName(name), "HELPFUL", restricted)
+        if aura ~= nil then roleAuraActive[name] = aura ~= false end
     end
 end
 
@@ -915,9 +947,11 @@ end
 -- Außerhalb des Kampfs sind Auren lesbar: Buff-Gruppen gegen die Realität abgleichen.
 function ns:SyncBuffs()
     if InCombatLockdown() or not self.rotation then return end
+    local restricted = aurasRestricted()
     for group, def in pairs(self.rotation.buffGroups) do
         local b = state.buffs[group]
         local found, expires
+        local unknown = false   -- Aura nicht lesbar: mitgezählten Stand behalten
         if def.totemSlot then
             -- Totem: GetTotemInfo(slot) = vorhanden, Name, Start, Dauer
             local have, tname, start, dur = safe(GetTotemInfo, def.totemSlot)
@@ -947,18 +981,22 @@ function ns:SyncBuffs()
         for _, name in ipairs(def.spells) do
             if def.totemSlot or def.weaponEnchant then break end
             if self.spells[name] then
-                local aura = safe(C_UnitAuras.GetAuraDataBySpellName, "player", self.spells[name].name, "HELPFUL")
+                local aura = readPlayerAura(self.spells[name].name, "HELPFUL", restricted)
                 if aura then
                     found = name
                     local exp = getField(aura, "expirationTime")
                     expires = (exp and exp > 0) and exp or math.huge -- 0 = ohne Ablauf (z. B. Aura)
                     break
+                elseif aura == nil then
+                    unknown = true
                 end
             end
         end
-        b.name = found
-        b.expires = found and expires or 0
-        b.exact = found ~= nil
+        if found or not unknown then
+            b.name = found
+            b.expires = found and expires or 0
+            b.exact = found ~= nil
+        end
     end
 end
 

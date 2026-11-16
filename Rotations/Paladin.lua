@@ -110,13 +110,23 @@ local function interruptRule()
         end }
 end
 
+-- Auren liegen in Forever auf der Haltungsleiste: GetShapeshiftForm ist auch im Kampf und bei
+-- Bossen lesbar, anders als die Aura-Daten. Aktive Haltung zählt daher als "Aura aktiv".
+local AURA_SET = {}
+for _, e in ipairs(AURA_SPELLS) do AURA_SET[e.name] = true end
+for _, n in ipairs({ "Shadow Resistance Aura", "Frost Resistance Aura", "Fire Resistance Aura" }) do AURA_SET[n] = true end
+
+local function auraActive(s)
+    return s.buff("aura") ~= nil or (s.form ~= nil and AURA_SET[s.form] == true)
+end
+
 -- Regeln für Aura (immer) und Segen (nur vor dem Kampf), vorne einzuhängen.
 local function buffRules(rules)
     for _, e in ipairs(AURA_SPELLS) do
         local name = e.name
         rules[#rules + 1] = { spell = name, reason = "Aura fehlt", group = "aura", groupLabel = "Aura (wenn keine aktiv)",
             cond = function(s)
-                return s.buff("aura") == nil and wanted(s, "aura", AURA_SPELLS, "Devotion Aura") == name
+                return not auraActive(s) and wanted(s, "aura", AURA_SPELLS, "Devotion Aura") == name
             end }
     end
     for _, e in ipairs(BLESSING_SPELLS) do
