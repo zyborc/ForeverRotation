@@ -186,6 +186,7 @@ add({
     ["{spell} (Untote/Dämonen-Gruppe)"] = "{spell} (undead/demon pack)",
     ["Untot/Dämon"] = "Undead/demon",
     ["{spell} (Untot/Dämon)"] = "{spell} (undead/demon)",
+    ["{spell} (Untot/Dämon, Option)"] = "{spell} (undead/demon, option)",
     ["Elite: Kreuzfahrer-Opener"] = "Elite: Crusader opener",
     ["Kreuzfahrer-Opener: {spell} (Elites)"] = "Crusader opener: {spell} (elites)",
     ["Kreuzfahrer richten"] = "Judge the Crusader seal",

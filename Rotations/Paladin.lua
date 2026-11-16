@@ -265,7 +265,10 @@ append(retRules, {
       cond = function(s) return not openerPending(s) and twistTarget(s) == "Seal of Righteousness" end },
     { spell = "Seal of Command", reason = "Twist: Kopien von {Seal of Righteousness} auslösen", group = "twist",
       cond = function(s) return not openerPending(s) and twistTarget(s) == "Seal of Command" end },
-
+})
+-- Hinrichten und Untote/Dämonen VOR dem Füller, sonst verdrängt Holy Strike sie
+append(retRules, finisherRules("aoe"))
+append(retRules, {
     -- Kernrotation
     { spell = "Judgement", reason = "{spell} bereit", label = "{spell}",
       cond = function(s) return s.hasTarget and sealActive(s) ~= nil and s.inRange("Judgement") ~= false end },
@@ -274,7 +277,6 @@ append(retRules, {
     { spell = "Consecration", reason = "Gruppe in Reichweite", label = "{spell} (ab X Gegnern)",
       cond = function(s) return s.inCombat and s.enemies >= s.opt("aoe") end },
 })
-append(retRules, finisherRules("aoe"))
 append(retRules, {
     { spell = "Holy Shock", reason = "Mana übrig", label = "{spell} (Option)",
       cond = function(s) return s.opt("holyShock") and s.hasTarget end },
@@ -368,6 +370,9 @@ append(protRules, {
       cond = function(s) return s.inCombat and s.hasTarget end },
     { spell = "Consecration", reason = "Gruppe: Bedrohung auf alle", label = "{spell} (ab X Gegnern)",
       cond = function(s) return s.inCombat and s.enemies >= s.opt("aoe") end },
+})
+append(protRules, finisherRules("aoe"))
+append(protRules, {
     { spell = "Judgement", reason = "{spell} bereit", label = "{spell} auf Cooldown",
       cond = function(s)
           return s.opt("judgeCD") and s.hasTarget and sealActive(s) ~= nil and s.inRange("Judgement") ~= false
@@ -375,7 +380,6 @@ append(protRules, {
     { spell = "Holy Strike", reason = "{spell} bereit", label = "{spell}",
       cond = function(s) return s.hasTarget and s.inRange("Holy Strike") ~= false end },
 })
-append(protRules, finisherRules("aoe"))
 
 ns:RegisterRotation({
     id = "PALADIN_PROTECTION",
@@ -417,6 +421,10 @@ append(holyRules, {
     { spell = "Judgement", reason = "Mana über {Seal of Wisdom}", label = "{spell} mit {Seal of Wisdom} (Option)",
       cond = function(s)
           return s.opt("wisdomSeal") and s.hasTarget and sealActive(s) == "Seal of Wisdom" and s.inRange("Judgement") ~= false
+      end },
+    { spell = "Exorcism", reason = "Untot/Dämon", label = "{spell} (Untot/Dämon, Option)",
+      cond = function(s)
+          return s.opt("dps") and s.hasTarget and isUndeadOrDemon(s) and s.inRange("Exorcism") ~= false
       end },
     { spell = "Holy Shock", reason = "Schaden, wenn nichts zu heilen ist", label = "{spell} (Schaden, Option)",
       cond = function(s) return s.opt("dps") and s.hasTarget end },
