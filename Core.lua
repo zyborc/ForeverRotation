@@ -66,15 +66,48 @@ function ns:SpellName(key)
     return (id and safe(C_Spell.GetSpellName, id)) or key
 end
 
+-- Alle Zauber aller Rotationen (Client-Sprache -> Schlüssel), z. B. für Gestalten,
+-- die nicht in der aktiven Rotation vorkommen. Wird bei Bedarf einmal aufgebaut.
+local allNames, allNamesCount = {}, -1
+
+local function buildAllNames()
+    local count = 0
+    for _ in pairs(ns.SPELL_IDS) do count = count + 1 end
+    if count == allNamesCount then return end
+    wipe(allNames)
+    for key, id in pairs(ns.SPELL_IDS) do
+        local n = safe(C_Spell.GetSpellName, id)
+        if n then allNames[n] = key end
+    end
+    allNamesCount = count
+end
+
 -- Name aus einem Ereignis (Client-Sprache) -> englischer Schlüssel
 function ns:KeyOf(name)
-    return nameToKey[name] or name
+    if nameToKey[name] then return nameToKey[name] end
+    buildAllNames()
+    return allNames[name] or name
 end
 
 -- Text übersetzen; {spell} = Zauber der Regel, {Seal of Command} = beliebiger Zauber
+-- Fehlt eine Übersetzung, wird eine Vorlage gesucht: "{Battle Shout} halten" -> "{1} halten".
 function ns:T(text, spell)
     if text == nil then return nil end
-    text = L[text]
+    local out = rawget(L, text)
+    if not out and text:find("{", 1, true) then
+        local tokens, n = {}, 0
+        local tpl = text:gsub("{([^}]+)}", function(k)
+            if k == "spell" then return "{spell}" end
+            n = n + 1
+            tokens[n] = k
+            return "{" .. n .. "}"
+        end)
+        local t = rawget(L, tpl)
+        if t then
+            out = t:gsub("{(%d+)}", function(i) return "{" .. (tokens[tonumber(i)] or "?") .. "}" end)
+        end
+    end
+    text = out or text
     if spell then text = (text:gsub("{spell}", function() return self:SpellName(spell) end)) end
     return (text:gsub("{([^}]+)}", function(k) return self:SpellName(k) end))
 end
@@ -110,6 +143,13 @@ ns.rotationOrder = {}    -- Reihenfolge der Registrierung
 --   roleAura    optional: Buffs, die diese Rolle verraten (z. B. { "Righteous Fury" })
 --   spellIds    { ["Englischer Name"] = Zauber-ID } – damit jede Client-Sprache funktioniert
 --   procs       optional: { ["Zauber"] = { label = "Text", color = {r, g, b} } } – Proc-Hinweis
+--   debuffs     optional: { gruppe = { spells = {...}, duration = Sekunden | function(combo) } }
+--               eigene DoTs/Debuffs auf dem Ziel, pro Ziel mitgezählt (im Kampf geheim)
+--   combo       optional: { builders = { ["Zauber"] = Punkte }, finishers = { "Zauber", ... }, max = 5 }
+--               Combo-Punkte mitzählen, falls das Spiel sie im Kampf nicht verrät
+--   forms       optional: Gestalten/Haltungen, die diese Rotation auswählen (z. B. { "Cat Form" })
+--   roleForm    optional: Gestalten/Haltungen, die die Rolle verraten (z. B. { "Defensive Stance" })
+--   signature   optional: Zauber (meist Talente), an denen die Spezialisierung erkannt wird
 function ns:RegisterRotation(def)
     assert(def.id and def.class and def.label and def.rules, "RegisterRotation: id, class, label und rules sind Pflicht")
     def.role = def.role or "DAMAGER"
@@ -117,7 +157,11 @@ function ns:RegisterRotation(def)
     def.options = def.options or {}
     def.hooks = def.hooks or {}
     def.extraSpells = def.extraSpells or {}
+    def.debuffs = def.debuffs or {}
     for key, id in pairs(def.spellIds or {}) do self.SPELL_IDS[key] = id end
+    for _, list in ipairs({ def.forms or {}, def.roleForm or {} }) do
+        for _, n in ipairs(list) do self.FORM_SPELLS[n] = true end
+    end
     -- Einträge für den Prioritäten-Editor: Regeln mit gleicher `group` bilden einen Eintrag
     -- (z. B. alle Aura-Regeln). Schlüssel: group > id > Zauber + Begründung.
     def.entries = {}
@@ -190,6 +234,37 @@ local function roleAuraNames()
     return names
 end
 
+-- Aktive Gestalt/Haltung (Gestaltwandel, Kampfhaltung, Schattengestalt, Verstohlenheit)
+-- als englischer Schlüssel, nil = keine.
+-- Ist die Gestalt im Kampf geheim, gilt die zuletzt gelesene bzw. zuletzt gezauberte.
+ns.FORM_SPELLS = {}   -- [Schlüssel] = true für alle Gestalt-/Haltungszauber (aus forms/roleForm/R.form)
+ns.formCache = nil
+
+function ns:ActiveForm()
+    local idx = safe(GetShapeshiftForm)
+    if type(idx) ~= "number" then return self.formCache end   -- geheim: zuletzt bekannte
+    if idx == 0 then
+        self.formCache = nil
+        return nil
+    end
+    local _, _, _, spellID = safe(GetShapeshiftFormInfo, idx)
+    if not spellID then return self.formCache end
+    local name = safe(C_Spell.GetSpellName, spellID)
+    self.formCache = name and self:KeyOf(name) or nil
+    return self.formCache
+end
+
+-- Kennt der Spieler den Zauber? Auch für Zauber, die nicht in der aktiven Rotation stehen.
+function ns:IsKnownKey(key)
+    local sp = self.spells[key]
+    if sp then return sp.known end
+    local id = self.SPELL_IDS[key]
+    local name = (id and safe(C_Spell.GetSpellName, id)) or key
+    local sid = getField(safe(C_Spell.GetSpellInfo, name), "spellID")
+    if not sid then return false end
+    return (safe(C_SpellBook and C_SpellBook.IsSpellKnown, sid) or safe(IsPlayerSpell, sid)) and true or false
+end
+
 -- Außerhalb des Kampfs sind Auren lesbar: Rollen-Buffs prüfen.
 function ns:ScanRoleAuras()
     if InCombatLockdown() then return end
@@ -212,6 +287,15 @@ function ns:DetectRole()
             return assigned, "Gruppenrolle"
         end
     end
+    -- Gestalt/Haltung verrät die Rolle (Bärengestalt, Verteidigungshaltung) – auch im Kampf lesbar
+    local form = self:ActiveForm()
+    if form then
+        for _, def in ipairs(self:CandidatesForPlayer()) do
+            for _, f in ipairs(def.roleForm or {}) do
+                if f == form then return def.role, form end
+            end
+        end
+    end
     for name, role in pairs(roleAuraNames()) do
         if roleAuraActive[name] then return role, name end
     end
@@ -229,9 +313,24 @@ function ns:PickRotation()
         if def.role == role then list[#list + 1] = def end
     end
     if #list == 0 then list = candidates end
+    -- aktive Gestalt wählt die Rotation (Katze -> Wildheit, Mondkin -> Gleichgewicht)
+    local form = self:ActiveForm()
+    if form then
+        for _, def in ipairs(list) do
+            for _, f in ipairs(def.forms or {}) do
+                if f == form then return def end
+            end
+        end
+    end
     local chosen = self.db.selected[charKey() .. "|" .. role]
     for _, def in ipairs(list) do
         if def.id == chosen then return def end
+    end
+    -- Spezialisierung an gelernten Talenten erkennen
+    for _, def in ipairs(list) do
+        for _, n in ipairs(def.signature or {}) do
+            if self:IsKnownKey(n) then return def end
+        end
     end
     local spec = safe(C_SpecializationInfo and C_SpecializationInfo.GetSpecialization)
     for _, def in ipairs(list) do
@@ -249,7 +348,9 @@ function ns:UpdateRotation()
         local hadRotation = self.rotation ~= nil
         self:SetRotation(def)
         if self.Display then self.Display:Init() end
-        if hadRotation then
+        -- Gestaltwechsel (Druide) wechselt oft die Rotation: nur einmal pro Rotation melden
+        if hadRotation and self.lastAnnounced ~= def.id then
+            self.lastAnnounced = def.id
             local role, source = self:DetectRole()
             print(self.PREFIX .. string.format(L["Rotation: %s (Rolle %s, erkannt über %s)"],
                 self:RotLabel(def), self:RoleLabel(role), self:SourceLabel(source)))
@@ -469,7 +570,17 @@ local function collectSpellNames(def)
     for _, group in pairs(def.buffGroups) do
         for _, n in ipairs(group.spells) do names[n] = true end
     end
+    for _, group in pairs(def.debuffs) do
+        for _, n in ipairs(group.spells) do names[n] = true end
+    end
     for _, n in ipairs(def.extraSpells) do names[n] = true end
+    for _, list in ipairs({ def.forms or {}, def.roleForm or {}, def.signature or {} }) do
+        for _, n in ipairs(list) do names[n] = true end
+    end
+    if def.combo then
+        for n in pairs(def.combo.builders or {}) do names[n] = true end
+        for _, n in ipairs(def.combo.finishers or {}) do names[n] = true end
+    end
     if def.rangeSpell then names[def.rangeSpell] = true end
     return names
 end
@@ -479,7 +590,8 @@ function ns:ResolveSpells()
     wipe(nameToKey)
     if not self.rotation then return end
     for name in pairs(collectSpellNames(self.rotation)) do
-        local baseId = self.SPELL_IDS[name]
+        -- IDs der eigenen Rotation zuerst (gleiche Namen bei verschiedenen Klassen, z. B. Lacerate)
+        local baseId = (self.rotation.spellIds and self.rotation.spellIds[name]) or self.SPELL_IDS[name]
         local localName = baseId and safe(C_Spell.GetSpellName, baseId)
         local info = safe(C_Spell.GetSpellInfo, localName or name)
         if not getField(info, "spellID") and baseId then
@@ -531,6 +643,8 @@ local state = {
     gcdStart = 0,
     gcdDur = 0,
     buffs = {},     -- [gruppe] = { name, expires, exact }
+    debuffs = {},   -- [Ziel-GUID oder "target"] = { [gruppe] = { name, expires } }
+    combo = 0,      -- mitgezählte Combo-Punkte (falls das Spiel sie im Kampf verbirgt)
     combatStart = 0,   -- GetTime() beim Kampfbeginn
     swingSpeed = nil,  -- Waffengeschwindigkeit, außerhalb des Kampfs gemessen (im Kampf geheim)
 }
@@ -543,18 +657,92 @@ function ns:MeasureSwing()
     if type(speed) == "number" and speed > 0.5 then state.swingSpeed = speed end
 end
 
-local buffGroupOf = {}  -- [Zaubername] = Gruppenname (für die aktive Rotation)
+local buffGroupOf = {}    -- [Zaubername] = { Gruppe, ... } (ein Zauber kann mehrere Gruppen setzen,
+                          -- z. B. Call of the Elements alle Totems)
+local debuffGroupOf = {}  -- [Zaubername] = { Gruppe, ... } für Debuffs auf dem Ziel
+
+local function addTo(map, name, group)
+    map[name] = map[name] or {}
+    table.insert(map[name], group)
+end
+
+-- Dauer einer Gruppe: Zahl oder Funktion der Combo-Punkte (Rip, Slice and Dice ...);
+-- `durations = { [Zauber] = Sekunden }` überschreibt sie für einzelne Zauber der Gruppe.
+local function groupDuration(gdef, combo, name)
+    local d = (gdef.durations and name and gdef.durations[name]) or gdef.duration
+    if type(d) == "function" then
+        local ok, v = pcall(d, combo or 0)
+        return ok and tonumber(v) or 0
+    end
+    return d or 0
+end
+
+-- Schlüssel des aktuellen Ziels für mitgezählte Debuffs (GUID; geheim -> "target")
+local function targetKey()
+    local guid = safe(UnitGUID, "target")
+    return type(guid) == "string" and guid or "target"
+end
 
 -- Gleichnamige Gruppen behalten ihren Stand (Rotationswechsel mitten im Kampf).
 function ns:ResetBuffState()
     local old = copyTable(state.buffs)
     wipe(state.buffs)
     wipe(buffGroupOf)
+    wipe(debuffGroupOf)
     if not self.rotation then return end
     for group, def in pairs(self.rotation.buffGroups) do
         state.buffs[group] = old[group] or { name = nil, expires = 0, exact = false }
-        for _, n in ipairs(def.spells) do buffGroupOf[n] = group end
+        for _, n in ipairs(def.spells) do addTo(buffGroupOf, n, group) end
     end
+    for group, def in pairs(self.rotation.debuffs) do
+        for _, n in ipairs(def.spells) do addTo(debuffGroupOf, n, group) end
+    end
+end
+
+-- Combo-Punkte: lesbar (außerhalb des Kampfs oder falls Forever sie zeigt), sonst mitgezählt.
+local function readCombo()
+    local cp = safe(GetComboPoints, "player", "target")
+    if type(cp) ~= "number" and Enum and Enum.PowerType and Enum.PowerType.ComboPoints then
+        cp = safe(UnitPower, "player", Enum.PowerType.ComboPoints)
+    end
+    return type(cp) == "number" and cp or nil
+end
+
+function ns:ComboPoints()
+    local cp = readCombo()
+    if cp then
+        state.combo = cp
+        return cp, true
+    end
+    return state.combo, false
+end
+
+-- Wirkung eines eigenen Casts auf Buffs, Debuffs und Combo-Punkte (live und in der Vorhersage)
+local function applyCast(def, name, at, buffs, debuffs, combo)
+    for _, group in ipairs(buffGroupOf[name] or {}) do
+        local b = buffs[group] or {}
+        buffs[group] = b
+        b.name = name
+        b.expires = at + groupDuration(def.buffGroups[group], combo, name)
+        b.exact = false
+    end
+    if debuffs then
+        for _, group in ipairs(debuffGroupOf[name] or {}) do
+            debuffs[group] = { name = name, expires = at + groupDuration(def.debuffs[group], combo, name) }
+        end
+    end
+    local c = def.combo
+    if c then
+        local add = c.builders and c.builders[name]
+        if add then
+            combo = math.min(c.max or 5, combo + add)
+        else
+            for _, f in ipairs(c.finishers or {}) do
+                if f == name then combo = 0 break end
+            end
+        end
+    end
+    return combo
 end
 
 -- Ausgelöste Effekte (z. B. der Schaden von Seal of Command) tragen den Namen des
@@ -573,8 +761,7 @@ local castLogUntil = 0
 -- Diagnose: alle eigenen Zauber-Ereignisse eine Zeit lang im Chat ausgeben.
 function ns:StartCastLog(seconds)
     castLogUntil = GetTime() + seconds
-    print(self.PREFIX .. string.format(L["Protokoll eigener Zauber für %d s. Kämpfe jetzt mit %s."], seconds,
-        self:SpellName("Seal of Command")))
+    print(self.PREFIX .. string.format(L["Protokoll eigener Zauber für %d s. Kämpfe jetzt."], seconds))
 end
 
 function ns:OnOwnCast(spellID)
@@ -595,6 +782,8 @@ function ns:OnOwnCast(spellID)
         roleAuraActive[name] = true
         self:UpdateRotation()
     end
+    -- Gestalt gezaubert: merken, falls sie im Kampf nicht lesbar ist
+    if self.FORM_SPELLS[name] then self.formCache = name end
     if not self.rotation then return end
     local now = GetTime()
     if self.Coach then self.Coach:OnCast(name, now) end
@@ -616,16 +805,14 @@ function ns:OnOwnCast(spellID)
         end
     end
 
-    local group = buffGroupOf[name]
-    if group then
-        local b = state.buffs[group]
-        b.name = name
-        b.expires = now + (self.rotation.buffGroups[group].duration or 0)
-        b.exact = false
+    -- Buffs, Debuffs auf dem Ziel und Combo-Punkte mitzählen
+    local tkey = targetKey()
+    state.debuffs[tkey] = state.debuffs[tkey] or {}
+    local comboBefore = self:ComboPoints()
+    state.combo = applyCast(self.rotation, name, now, state.buffs, state.debuffs[tkey], comboBefore)
+    if buffGroupOf[name] and not InCombatLockdown() and C_Timer then
         -- Segen auf andere Spieler zählen nicht: außerhalb des Kampfs kurz danach echt abgleichen
-        if not InCombatLockdown() and C_Timer then
-            C_Timer.After(0.3, function() ns:SyncBuffs() end)
-        end
+        C_Timer.After(0.3, function() ns:SyncBuffs() end)
     end
 
     if self.rotation.hooks.onCast then
@@ -727,7 +914,34 @@ function ns:SyncBuffs()
     for group, def in pairs(self.rotation.buffGroups) do
         local b = state.buffs[group]
         local found, expires
+        if def.totemSlot then
+            -- Totem: GetTotemInfo(slot) = vorhanden, Name, Start, Dauer
+            local have, tname, start, dur = safe(GetTotemInfo, def.totemSlot)
+            if have and tname and tname ~= "" then
+                local key = self:KeyOf(tname)
+                found = key
+                for _, n in ipairs(def.spells) do
+                    if self.spells[n] and self.spells[n].name == tname then found = n end
+                end
+                expires = (start and dur and dur > 0) and (start + dur) or math.huge
+            end
+        elseif def.weaponEnchant then
+            -- Waffenverzauberung (Schamanen-Waffen, Gifte, Öle): welche genau, verrät das Spiel nicht
+            local hasMain, mainExp, _, _ = safe(GetWeaponEnchantInfo)
+            local hasOff, offExp
+            do
+                local ok, _, _, _, _, ho, oe = pcall(GetWeaponEnchantInfo)
+                if ok and not isSecret(ho) then hasOff, offExp = ho, oe end
+            end
+            local has, exp = hasMain, mainExp
+            if def.weaponEnchant == "off" then has, exp = hasOff, offExp end
+            if has then
+                found = b.name or def.spells[1]
+                expires = GetTime() + ((type(exp) == "number" and not isSecret(exp)) and exp / 1000 or 1800)
+            end
+        end
         for _, name in ipairs(def.spells) do
+            if def.totemSlot or def.weaponEnchant then break end
             if self.spells[name] then
                 local aura = safe(C_UnitAuras.GetAuraDataBySpellName, "player", self.spells[name].name, "HELPFUL")
                 if aura then
@@ -819,6 +1033,9 @@ function ns:Snapshot(sim)
         s.role = base.role
         s.targetCasting = base.targetCasting
         s.targetInterruptible = base.targetInterruptible
+        s.form, s.stealthed, s.hasPet = base.form, base.stealthed, base.hasPet
+        s.power, s.powerMax = base.power, base.powerMax
+        s.comboExact = base.comboExact
     else
         s.hasTarget = safe(UnitCanAttack, "player", "target") and not safe(UnitIsDead, "target") or false
     end
@@ -834,7 +1051,23 @@ function ns:Snapshot(sim)
         -- Zauber des Ziels (zum Unterbrechen); interruptible nil = unbekannt
         s.targetCasting, s.targetInterruptible = targetCastState()
     end
-    if not (sim and sim.base) then s.role = (ns:DetectRole()) end
+    if not (sim and sim.base) then
+        s.role = (ns:DetectRole())
+        s.form = self:ActiveForm()                      -- Gestalt/Haltung (englischer Schlüssel) oder nil
+        s.stealthed = safe(IsStealthed) and true or false
+        s.hasPet = (safe(UnitExists, "pet") and not safe(UnitIsDead, "pet")) and true or false
+        -- Ressource (Wut/Energie/Mana): nil, wenn im Kampf geheim
+        local p, pm = safe(UnitPower, "player"), safe(UnitPowerMax, "player")
+        s.power = type(p) == "number" and p or nil
+        s.powerMax = type(pm) == "number" and pm or nil
+    end
+    -- Combo-Punkte: in der Vorhersage mitgezählt, sonst lesbar oder mitgezählt
+    if sim then
+        s.combo = sim.combo or 0
+    else
+        s.combo, s.comboExact = self:ComboPoints()
+    end
+    local debuffs = (sim and sim.debuffs) or state.debuffs[targetKey()] or {}
     s.enemies = (sim and sim.enemies) or self:CountEnemiesInRange()
 
     s.opt = function(name) return ns:Opt(name) end
@@ -861,6 +1094,17 @@ function ns:Snapshot(sim)
         if not b or not b.name then return nil, 0 end
         return b.name, math.max(0, b.expires - now)
     end
+    -- Eigener Debuff/DoT auf dem aktuellen Ziel: Name und Restzeit (mitgezählt)
+    s.debuff = function(group)
+        local d = debuffs[group]
+        if not d or not d.name or d.expires <= now then return nil, 0 end
+        return d.name, d.expires - now
+    end
+    -- Zauber scheitert gerade nur an Mana/Wut/Energie
+    s.oom = function(name)
+        local usable, noMana = s.usable(name)
+        return (not usable) and noMana
+    end
     return s
 end
 
@@ -884,6 +1128,9 @@ function ns:Predict(count, horizon, base)
         base = base,
     }
     for group, b in pairs(state.buffs) do sim.buffs[group] = copyTable(b) end
+    sim.debuffs = {}
+    for group, d in pairs(state.debuffs[targetKey()] or {}) do sim.debuffs[group] = copyTable(d) end
+    sim.combo = base.combo or 0
 
     -- Zeit schrittweise vorspulen: Ist gerade nichts bereit, höchstens 0,5 s weiter
     -- und neu bewerten. So erscheinen auch zeitabhängige Regeln (z. B. "Siegel
@@ -916,10 +1163,7 @@ function ns:SimulateCast(sim, name, at)
     local cd = self:CooldownOf(name)
     if cd > 0 then sim.readyAt[name] = at + cd end
     if sp and sp.gcd > 0 then sim.gcdEnd = at + sp.gcd end
-    local group = buffGroupOf[name]
-    if group then
-        sim.buffs[group] = { name = name, expires = at + (self.rotation.buffGroups[group].duration or 0) }
-    end
+    sim.combo = applyCast(self.rotation, name, at, sim.buffs, sim.debuffs, sim.combo or 0)
     if self.rotation.hooks.onCast then
         pcall(self.rotation.hooks.onCast, name, self:Snapshot(sim), sim.custom)
     end
@@ -1012,11 +1256,13 @@ local function registerRuntimeEvents()
     for _, ev in ipairs({ "SPELLS_CHANGED", "SPELL_UPDATE_COOLDOWN", "PLAYER_REGEN_ENABLED",
             "PLAYER_TARGET_CHANGED", "ACTIONBAR_SLOT_CHANGED", "UPDATE_BINDINGS",
             "PLAYER_SPECIALIZATION_CHANGED", "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED",
-            "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED", "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE" }) do
+            "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED", "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE",
+            "UPDATE_SHAPESHIFT_FORM", "PLAYER_TOTEM_UPDATE" }) do
         pcall(frame.RegisterEvent, frame, ev)
     end
     pcall(frame.RegisterUnitEvent, frame, "UNIT_SPELLCAST_SUCCEEDED", "player")
     pcall(frame.RegisterUnitEvent, frame, "UNIT_AURA", "player")
+    pcall(frame.RegisterUnitEvent, frame, "UNIT_INVENTORY_CHANGED", "player")
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
@@ -1037,6 +1283,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
         registerRuntimeEvents()
         ns:MeasureSwing()
         ns:SetRotation(def)
+        ns.lastAnnounced = def.id
         if ns.Display then ns.Display:Init() end
         local role, source = ns:DetectRole()
         print(ns.PREFIX .. string.format(L["geladen: %s (Rolle %s, %s). /frot öffnet die Einstellungen."],
@@ -1060,6 +1307,8 @@ frame:SetScript("OnEvent", function(_, event, ...)
         ns:ScanRoleAuras()
         ns:UpdateRotation()
         ns:MeasureSwing()
+        wipe(state.debuffs)            -- Kampf vorbei: mitgezählte DoTs verwerfen
+        state.combo = readCombo() or 0
         ns:SyncCooldowns()
         ns:SyncBuffs()
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -1068,9 +1317,15 @@ frame:SetScript("OnEvent", function(_, event, ...)
         ns:MeasureSwing()
     elseif event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" then
         ns:ResolveSpells()
+        ns:UpdateRotation()   -- Talente verraten die Spezialisierung
+    elseif event == "UPDATE_SHAPESHIFT_FORM" then
+        ns:UpdateRotation()   -- Gestalt/Haltung kann Rolle und Rotation ändern
+    elseif event == "PLAYER_TOTEM_UPDATE" or event == "UNIT_INVENTORY_CHANGED" then
+        if not InCombatLockdown() then ns:SyncBuffs() end
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
         ns:UpdateRotation()
     elseif event == "PLAYER_TARGET_CHANGED" then
+        state.debuffs.target = nil   -- Ziel ohne lesbare GUID: Zählung neu beginnen
         local hooks = ns.rotation and ns.rotation.hooks
         if hooks and hooks.onTargetChanged then hooks.onTargetChanged(ns.custom) end
     elseif event == "SPELLS_CHANGED" then
@@ -1104,6 +1359,14 @@ local function printState()
         print(string.format(L["  Buff-Gruppe %s: %s (%s, %s)"], group, name and ns:SpellName(name) or "-",
             remain == math.huge and L["ohne Ablauf"] or string.format("%.1fs", remain), exact and L["exakt"] or L["geschätzt"]))
     end
+    for group in pairs(ns.rotation.debuffs) do
+        local name, remain = s.debuff(group)
+        print(string.format(L["  Debuff auf dem Ziel %s: %s (%.1fs)"], group, name and ns:SpellName(name) or "-", remain))
+    end
+    if ns.rotation.combo then
+        print(string.format(L["  Combo-Punkte: %d (%s)"], s.combo, s.comboExact and L["exakt"] or L["geschätzt"]))
+    end
+    if s.form then print(L["  Gestalt/Haltung: "] .. ns:SpellName(s.form)) end
     local names = {}
     for name in pairs(ns.spells) do names[#names + 1] = name end
     table.sort(names)

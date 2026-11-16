@@ -112,5 +112,58 @@ Nur Werte, die in Forever **im Kampf lesbar** sind (gemessen mit ForeverProbe):
 | `s.buff(gruppe)` | aktiver Buff der Gruppe und Restzeit (geschätzt im Kampf) |
 | `s.opt(name)` | Option der Rotation |
 | `s.custom` | eigener Zustand der Rotation (Hooks) |
+| `s.debuff(gruppe)` | eigener DoT/Debuff auf dem aktuellen Ziel: Name und Restzeit (pro Ziel mitgezählt) |
+| `s.combo`, `s.comboExact` | Combo-Punkte (lesbar oder über `combo` mitgezählt) |
+| `s.form` | aktive Gestalt/Haltung als englischer Schlüssel („Cat Form“, „Defensive Stance“) oder nil |
+| `s.stealthed` | Verstohlenheit/Prowl aktiv |
+| `s.hasPet` | Begleiter da und lebt |
+| `s.power`, `s.powerMax` | Wut/Energie/Mana – `nil`, wenn im Kampf geheim |
+| `s.oom(name)` | Zauber scheitert gerade nur an Mana/Wut/Energie |
 
 **Nicht** verfügbar (im Kampf geheim): Leben/Mana in Zahlen, Auren-Inhalte, echte Cooldown-Zeiten, Kampflog.
+
+## Weitere Felder (seit 0.12)
+
+```lua
+    -- DoTs/Debuffs auf dem Ziel: pro Ziel-GUID über eigene Casts mitgezählt
+    debuffs = {
+        rend = { spells = { "Rend" }, duration = 15 },
+        bane = { spells = { "Bane of Agony", "Bane of Doom" }, duration = 24, durations = { ["Bane of Doom"] = 60 } },
+        rip  = { spells = { "Rip" }, duration = function(combo) return 6 + 2 * combo end },
+    },
+    -- Combo-Punkte mitzählen (falls im Kampf geheim): Aufbauer +n, Finisher setzen auf 0
+    combo = { builders = { ["Sinister Strike"] = 1, ["Mutilate"] = 2 }, finishers = { "Eviscerate" }, max = 5 },
+    forms = { "Cat Form" },            -- diese Gestalt wählt die Rotation (Druide)
+    roleForm = { "Defensive Stance" }, -- diese Gestalt verrät die Rolle (wie roleAura)
+    signature = { "Mortal Strike" },   -- gelernte Talente verraten die Spezialisierung
+```
+
+Buff-Gruppen können außerdem `totemSlot = 1..4` (Totem, abgeglichen über `GetTotemInfo`) oder
+`weaponEnchant = "main" | "off"` (Waffenverzauberung, abgeglichen über `GetWeaponEnchantInfo`) haben.
+Ein Zauber darf in mehreren Gruppen stehen (z. B. Call of the Elements in allen vier Totem-Gruppen).
+
+Auswahl der Rotation innerhalb einer Rolle: aktive Gestalt (`forms`) > gespeicherte Wahl >
+`signature` > Spezialisierung > erste registrierte.
+
+## Bausteine (`Rotations/_Shared.lua`, `ns.R`)
+
+| Helfer | Regel |
+|---|---|
+| `R.interrupt(spell)` | unterbrechen, wenn das Ziel zaubert (Option `interrupt`) |
+| `R.form(spell)` | Gestalt/Haltung halten |
+| `R.buff(spell, { group, refresh, ooc, combat, cond })` | eigenen Buff halten |
+| `R.dot(spell, { group, cond, always })` | DoT/Debuff halten (Optionen `dotRefresh`, `dotTrash`) |
+| `R.ready(spell, cond, label)` | sobald bereit |
+| `R.reactive(spell)` / `R.execute(spell)` | nur nutzbar nach Ausweichen/Kill bzw. unter 20 % (prüft das Spiel) |
+| `R.aoe(spell, opt)` | ab X Gegnern |
+| `R.burst(spell)` | großer Cooldown (Option `burst`: Elites/immer/aus) |
+| `R.regen(spell, filler)` | Mana/Energie holen, wenn der Füller daran scheitert |
+| `R.taunt(spell)` | Spott, wenn das Ziel nicht dich angreift |
+| `R.pet(spell, wantedFn)` | Begleiter beschwören |
+| `R.dump(spell, threshOpt)` | Wut-Dump (Schwelle nur, wenn Wut lesbar ist) |
+
+Fertige Optionen: `R.opt.interrupt`, `R.opt.aoe`, `R.opt.burst`, `R.opt.dotRefresh`, `R.opt.dotTrash`,
+`R.opt.taunt`; zusammenführen mit `R.options(a, b, ...)`.
+
+Übersetzung: Fehlt ein Text in Locale.lua, wird eine Vorlage gesucht, in der Zaubernamen durch
+`{1}`, `{2}` … ersetzt sind („{Rend} halten“ → „{1} halten“). Eine Vorlage deckt so viele Optionen ab.

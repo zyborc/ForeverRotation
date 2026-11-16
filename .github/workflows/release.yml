@@ -1,0 +1,29 @@
+# Baut bei jedem Tag "v*" eine installierbare ZIP (Ordner ForeverRotation/) und hängt sie an das Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZIP bauen
+        run: |
+          mkdir -p dist/ForeverRotation
+          rsync -a --exclude '.git*' --exclude '.github' --exclude 'dist' --exclude '*.md' ./ dist/ForeverRotation/
+          cp README.md dist/ForeverRotation/README.md
+          cd dist && zip -r "ForeverRotation-${GITHUB_REF_NAME}.zip" ForeverRotation
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/ForeverRotation-${GITHUB_REF_NAME}.zip" \
+            --title "ForeverRotation ${GITHUB_REF_NAME}" --generate-notes

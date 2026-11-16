@@ -405,3 +405,36 @@ ns:RegisterRotation({
 
     rules = protRules,
 })
+
+---------------------------------------------------------------------------
+-- Heilig / Heiler: Leben ist im Kampf geheim – nur Aura, Segen, Siegel und Cooldowns
+---------------------------------------------------------------------------
+
+local holyRules = buffRules({ interruptRule() })
+append(holyRules, {
+    { spell = "Seal of Wisdom", reason = "Siegel fehlt / läuft aus", label = "{spell} halten (Option)",
+      cond = function(s) return s.opt("wisdomSeal") and s.inCombat and needSeal(s, "Seal of Wisdom") end },
+    { spell = "Judgement", reason = "Mana über {Seal of Wisdom}", label = "{spell} mit {Seal of Wisdom} (Option)",
+      cond = function(s)
+          return s.opt("wisdomSeal") and s.hasTarget and sealActive(s) == "Seal of Wisdom" and s.inRange("Judgement") ~= false
+      end },
+    { spell = "Holy Shock", reason = "Schaden, wenn nichts zu heilen ist", label = "{spell} (Schaden, Option)",
+      cond = function(s) return s.opt("dps") and s.hasTarget end },
+})
+
+ns:RegisterRotation({
+    id = "PALADIN_HOLY",
+    class = "PALADIN",
+    role = "HEALER",
+    label = "Paladin – Heilig (Buffs & Siegel)",
+    rangeSpell = "Holy Strike",
+    spellIds = SPELL_IDS,
+    buffGroups = sharedBuffGroups(),
+    options = sharedOptions({ aura = "concentration", blessing = "wisdom" }, {
+        wisdomSeal = { order = 1, default = false, label = "{Seal of Wisdom} und richten",
+                       desc = "Mana zurück über {Judgement} mit {Seal of Wisdom} – lohnt, wenn du ein Ziel in Reichweite hast." },
+        dps = { order = 3, default = false, label = "Schaden, wenn nichts zu heilen ist",
+                desc = "Leben ist im Kampf geheim – schalte das ein, wenn du zwischendurch Schaden machen willst." },
+    }),
+    rules = holyRules,
+})

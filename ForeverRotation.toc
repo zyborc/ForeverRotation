@@ -2,15 +2,26 @@
 ## Title: ForeverRotation
 ## Notes: Rotation helper for WoW Forever. Shows the next spell without reading secret values. /frot
 ## Notes-deDE: Rotationshelfer für WoW Forever. Zeigt den nächsten Zauber an, ohne geheime Werte zu lesen. /frot
-## Author: Alex
-## Version: 0.11.0
+## Author: Alex (zyborc)
+## X-Website: https://github.com/zyborc/ForeverRotation
+## X-License: MIT
+## Version: 0.12.0
 ## SavedVariables: ForeverRotationDB
 ## IconTexture: Interface\Icons\Spell_Holy_HolyBolt
 ## AddonCompartmentFunc: ForeverRotation_OnCompartmentClick
 
 Locale.lua
 Core.lua
+Rotations\_Shared.lua
 Rotations\Paladin.lua
+Rotations\Warrior.lua
+Rotations\Rogue.lua
+Rotations\Hunter.lua
+Rotations\Mage.lua
+Rotations\Warlock.lua
+Rotations\Priest.lua
+Rotations\Shaman.lua
+Rotations\Druid.lua
 Display.lua
 ActionGlow.lua
 Coach.lua

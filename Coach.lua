@@ -71,7 +71,8 @@ function Coach:OnRecommend(rule, readyNow, s)
     -- Buffs mit kurzer Dauer (Siegel), die im Kampf auslaufen
     local def = ns.rotation
     for group, gdef in pairs(def.buffGroups) do
-        if (gdef.duration or 0) <= 60 then
+        local d = gdef.duration   -- Zahl oder Funktion der Combo-Punkte (z. B. Slice and Dice)
+        if type(d) ~= "number" or d <= 60 then
             local b = ns.state.buffs[group]
             if b and b.name and b.expires < now and fight.dropSeen[group] ~= b.expires then
                 fight.dropSeen[group] = b.expires
