@@ -801,6 +801,7 @@ function ns:StartCastLog(seconds)
 end
 
 function ns:OnOwnCast(spellID)
+    self.castSerial = (self.castSerial or 0) + 1   -- Vorhersage neu rechnen
     local localName = safe(C_Spell.GetSpellName, spellID)
     if not localName then return end
     local name = self:KeyOf(localName)
@@ -1021,7 +1022,17 @@ local function targetCastState()
     return true, notInt ~= true
 end
 
+-- Namensplaketten durchgehen kostet im Dungeon spürbar: höchstens 5x pro Sekunde zählen.
+local enemyCache = { at = -1, count = 0 }
 function ns:CountEnemiesInRange()
+    local now = GetTime()
+    if now - enemyCache.at < 0.2 then return enemyCache.count end
+    enemyCache.at = now
+    enemyCache.count = self:CountEnemiesNow()
+    return enemyCache.count
+end
+
+function ns:CountEnemiesNow()
     local rangeName = self.rotation and self.rotation.rangeSpell
     local rangeId = rangeName and self.spells[rangeName] and self.spells[rangeName].id
     local plates = safe(C_NamePlate.GetNamePlates)

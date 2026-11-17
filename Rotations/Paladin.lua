@@ -210,10 +210,17 @@ local function targetKey()
     return type(guid) == "string" and guid or "target"
 end
 
+-- Nur außerhalb des Kampfs lesen (im Kampf wirft die Abfrage – teuer bei 20 Bewertungen pro
+-- Sekunde samt Vorhersage) und pro Ziel kurz zwischenspeichern.
+local jotcCache = { key = nil, at = -1, val = false }
 local function crusaderOnTarget()
-    if not (C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName) then return false end
+    if InCombatLockdown() or not (C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName) then return false end
+    local key, now = targetKey(), GetTime()
+    if jotcCache.key == key and now - jotcCache.at < 0.5 then return jotcCache.val end
     local name = ns.safe(C_Spell.GetSpellName, JOTC_ID) or "Judgement of the Crusader"
-    return ns.safe(C_UnitAuras.GetAuraDataBySpellName, "target", name, "HARMFUL") ~= nil
+    local val = ns.safe(C_UnitAuras.GetAuraDataBySpellName, "target", name, "HARMFUL") ~= nil
+    jotcCache.key, jotcCache.at, jotcCache.val = key, now, val
+    return val
 end
 
 local function crusaderDone(s)

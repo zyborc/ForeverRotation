@@ -15,6 +15,7 @@ local buttons = {}      -- alle gefundenen Aktionsknöpfe
 local bySpell = {}      -- [Zaubername in Client-Sprache] = { Knopf, ... }
 local glows = {}        -- [Knopf] = Leucht-Rahmen
 local lit = {}          -- [Knopf] = true, gerade leuchtend
+local wantBuf = {}      -- wiederverwendet statt 20 neue Tabellen pro Sekunde
 local dirty = true      -- Zuordnung Knopf -> Zauber neu aufbauen
 local lastScan = 0
 
@@ -208,7 +209,7 @@ function ActionGlow:Update(rule, readyNow, noMana, outOfRange)
     if noMana then r, gr, b = 0.3, 0.5, 1            -- blau: zu wenig Mana
     elseif outOfRange then r, gr, b = 1, 0.25, 0.2   -- rot: außer Reichweite
     elseif not readyNow then r, gr, b = 0.6, 0.6, 0.6 end -- grau: kommt gleich
-    local want = {}
+    local want = wipe(wantBuf)
     if list then
         for _, btn in ipairs(list) do
             if btn:IsVisible() then

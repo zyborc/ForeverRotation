@@ -681,7 +681,20 @@ end
 local function updateTimeline(tl, s, g, skipFirst)
     local horizon = g.timelineSeconds or 6
     if tl.horizon ~= horizon then layoutTicks(tl, horizon) end
-    local preds = ns:Predict(TL_MAX + 1, horizon, s)
+    -- Die Vorhersage rechnet viele Züge voraus: nicht 20x pro Sekunde, sondern nach eigenen
+    -- Zaubern, Ziel-/Gegnerwechsel und sonst alle 0,3 s. Zeitpunkte sind absolut, die Icons
+    -- gleiten dazwischen trotzdem flüssig.
+    local guid = ns.safe(UnitGUID, "target")
+    local c = tl.predCache
+    if not c then c = {}; tl.predCache = c end
+    if not c.preds or s.now >= c.until_ or c.serial ~= ns.castSerial or c.guid ~= guid
+            or c.enemies ~= s.enemies or c.hasTarget ~= s.hasTarget or c.rot ~= ns.rotation
+            or c.horizon ~= horizon or c.inCombat ~= s.inCombat then
+        c.preds = ns:Predict(TL_MAX + 1, horizon, s)
+        c.until_, c.serial, c.guid, c.enemies = s.now + 0.3, ns.castSerial, guid, s.enemies
+        c.hasTarget, c.rot, c.horizon, c.inCombat = s.hasTarget, ns.rotation, horizon, s.inCombat
+    end
+    local preds = c.preds   -- überfällige Einträge (noch nicht gedrückt) bleiben vorne bei x = 0
     local usable = TL_WIDTH - TL_ICON
     local lastX = -math.huge
     local shown = 0
