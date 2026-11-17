@@ -607,4 +607,8 @@ add({
     ["Später"] = "Later",
     ["Rotationshelfer für WoW Forever. Zeigt den nächsten Zauber an, ohne geheime Werte zu lesen. Alle Einstellungen liegen im eigenen Fenster (/frot)."] = "Rotation helper for WoW Forever. Shows the next spell without reading secret values. All settings live in the addon's own window (/frot).",
     ["Einstellungen öffnen"] = "Open settings",
+    ["  Cooldown-Manager: %s | Cooldown-Prüfung: %s (%d passend, %d abweichend)"] = "  Cooldown Manager: %s | cooldown check: %s (%d matching, %d differing)",
+    ["aktiv"] = "active",
+    ["noch nicht bestätigt"] = "not confirmed yet",
+    ["    CDM %s: %s, Stapel %s"] = "    CDM %s: %s, stacks %s",
 })

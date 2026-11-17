@@ -761,6 +761,7 @@ local function applyCast(def, name, at, buffs, debuffs, combo)
         b.name = name
         b.expires = at + groupDuration(def.buffGroups[group], combo, name)
         b.exact = false
+        b.castAt = at   -- CDM braucht einen Moment, bis er den Wechsel zeigt
     end
     if debuffs then
         for _, group in ipairs(debuffGroupOf[name] or {}) do
@@ -911,6 +912,7 @@ end
 
 -- Außerhalb des Kampfs sind Cooldowns lesbar: echte Werte übernehmen und lernen.
 function ns:SyncCooldowns()
+    if self.CDM then self.CDM:Calibrate(self.spells) end
     for name, s in pairs(self.spells) do
         local cdInfo = safe(C_Spell.GetSpellCooldown, s.id)
         local start = getField(cdInfo, "startTime")
@@ -1002,6 +1004,58 @@ function ns:SyncBuffs()
 end
 
 ---------------------------------------------------------------------------
+-- Im Kampf: Blizzard-Cooldown-Manager und Cooldown-Trick (siehe CooldownManager.lua)
+-- korrigieren den Schattenzustand. Aufruf aus der Anzeige, höchstens 4x pro Sekunde.
+---------------------------------------------------------------------------
+
+local lastCombatSync = -1
+function ns:CombatSync()
+    if not (self.rotation and self.CDM) then return end
+    local now = GetTime()
+    if now - lastCombatSync < 0.25 then return end
+    lastCombatSync = now
+    if not aurasRestricted() then return end   -- außerhalb gelten die echten Werte (SyncBuffs)
+
+    -- Buff-Gruppen: Der CDM verrät, OB eine verfolgte Aura liegt – bei Siegeln sogar WELCHE.
+    for group, def in pairs(self.rotation.buffGroups) do
+        local b = state.buffs[group]
+        if b and not (def.totemSlot or def.weaponEnchant) and now - (b.castAt or 0) > 1 then
+            local on
+            for _, name in ipairs(def.spells) do
+                if self.CDM:State(name) == true then on = name; break end
+            end
+            if on then
+                if b.name ~= on or b.expires <= now then
+                    b.name = on
+                    b.expires = now + groupDuration(def, state.combo, on)
+                    b.exact = false
+                end
+            elseif b.name and self.CDM:State(b.name) == false then
+                b.name, b.expires, b.exact = nil, 0, false   -- Aura weg (abgelaufen, gebannt, Tod)
+            end
+        end
+    end
+
+    -- Cooldowns: nur ja/nein, und nur wenn der Trick vorher geprüft wurde und kein GCD läuft
+    -- (sonst ist unklar, ob "läuft" den GCD meint).
+    if self.CDM:CooldownTrusted() and now > state.gcdEnd + 0.05 then
+        for name, sp in pairs(self.spells) do
+            if sp.known and self:CooldownOf(name) > 1.6 then
+                local onCD = self.CDM:OnCooldown(sp.id)
+                local readyAt = state.readyAt[name] or 0
+                if onCD == false and readyAt > now + 0.3 then
+                    state.readyAt[name] = now          -- vorzeitig frei (Proc, Talent, Reset)
+                    state.cdDur[name] = nil
+                elseif onCD == true and readyAt <= now then
+                    state.readyAt[name] = now + 0.3    -- läuft doch noch: gleich erneut prüfen
+                end
+            end
+        end
+    end
+end
+
+
+---------------------------------------------------------------------------
 -- Ziel und Gegner
 ---------------------------------------------------------------------------
 
@@ -1061,18 +1115,74 @@ end
 -- Momentaufnahme für die Regeln. Alles, was eine Rotation abfragen darf, steht hier.
 -- Ohne Argument: Live-Zustand. Mit `sim`: simulierter Zustand für die Timeline-Vorhersage
 -- (sim = { t, readyAt, gcdEnd, buffs, custom }). Ziel, Reichweite und Nutzbarkeit sind immer live.
-function ns:Snapshot(sim)
+-- Abfragen für die Regeln. Einmal pro Momentaufnahme-Tabelle angelegt; sie lesen die
+-- aktuellen Werte aus s (s._readyAt, s._buffs, s._debuffs, s.now). So kann die Vorhersage
+-- eine Tabelle für alle Schritte wiederverwenden statt pro Schritt zehn neue Funktionen zu bauen.
+local function attachQueries(s)
+    s.opt = function(name) return ns:Opt(name) end
+    s.known = function(name) return ns:Known(name) end
+    s.cdRemain = function(name) return math.max(0, (s._readyAt[name] or 0) - s.now) end
+    s.onGCD = function(name)
+        local sp = ns.spells[name]
+        return sp and sp.gcd > 0
+    end
+    s.usable = function(name)
+        local sp = ns.spells[name]
+        if not sp then return false, false end
+        local usable, noMana = safe(C_Spell.IsSpellUsable, sp.id)
+        return usable and true or false, noMana and true or false
+    end
+    s.inRange = function(name)
+        local sp = ns.spells[name]
+        if not sp or not s.hasTarget then return nil end
+        return safe(C_Spell.IsSpellInRange, sp.id, "target")
+    end
+    -- Buff-Gruppe: aktiver Name und Restzeit (geschätzt im Kampf, exakt außerhalb)
+    s.buff = function(group)
+        local b = s._buffs[group]
+        if not b or not b.name then return nil, 0 end
+        return b.name, math.max(0, b.expires - s.now)
+    end
+    -- Eigener Debuff/DoT auf dem aktuellen Ziel: Name und Restzeit (mitgezählt)
+    s.debuff = function(group)
+        local d = s._debuffs[group]
+        if not d or not d.name or d.expires <= s.now then return nil, 0 end
+        return d.name, d.expires - s.now
+    end
+    -- Zauber scheitert gerade nur an Mana/Wut/Energie
+    s.oom = function(name)
+        local usable, noMana = s.usable(name)
+        return (not usable) and noMana
+    end
+    -- Blizzard-Cooldown-Manager (nur live, in der Vorhersage nil):
+    -- cdm(name) = true aktiv / false sicher aus / nil unbekannt; cdmStacks(name) = Stapel, nurMindestens
+    s.cdm = function(name)
+        if s._sim or not ns.CDM then return nil end
+        return ns.CDM:State(name)
+    end
+    s.cdmStacks = function(name)
+        if s._sim or not ns.CDM then return nil end
+        return ns.CDM:Stacks(name)
+    end
+end
+
+-- Momentaufnahme für die Regeln. Alles, was eine Rotation abfragen darf, steht hier.
+-- Ohne Argument: Live-Zustand. Mit `sim`: simulierter Zustand für die Timeline-Vorhersage
+-- (sim = { t, readyAt, gcdEnd, buffs, custom }). Ziel, Reichweite und Nutzbarkeit sind immer live.
+-- reuse: Tabelle einer früheren Momentaufnahme (nur mit sim.base), wird überschrieben.
+function ns:Snapshot(sim, reuse)
     local now = sim and sim.t or GetTime()
-    local readyAt = sim and sim.readyAt or state.readyAt
-    local buffs = sim and sim.buffs or state.buffs
-    local s = {
-        now = now,
-        gcdRemain = math.max(0, (sim and sim.gcdEnd or state.gcdEnd) - now),
-        inCombat = InCombatLockdown(),
-        custom = sim and sim.custom or self.custom,
-        combatStart = state.combatStart,
-        swingSpeed = state.swingSpeed or 3.5,
-    }
+    local s = (reuse and sim and sim.base) and reuse or {}
+    if not s.opt then attachQueries(s) end
+    s._sim = sim ~= nil
+    s._readyAt = sim and sim.readyAt or state.readyAt
+    s._buffs = sim and sim.buffs or state.buffs
+    s.now = now
+    s.gcdRemain = math.max(0, (sim and sim.gcdEnd or state.gcdEnd) - now)
+    s.inCombat = InCombatLockdown()
+    s.custom = sim and sim.custom or self.custom
+    s.combatStart = state.combatStart
+    s.swingSpeed = state.swingSpeed or 3.5
     if sim and sim.base then
         -- Vorhersage: Zielinfos nicht bei jedem Schritt neu abfragen
         local base = sim.base
@@ -1120,44 +1230,8 @@ function ns:Snapshot(sim)
     else
         s.combo, s.comboExact = self:ComboPoints()
     end
-    local debuffs = (sim and sim.debuffs) or state.debuffs[targetKey()] or {}
+    s._debuffs = (sim and sim.debuffs) or state.debuffs[targetKey()] or {}
     s.enemies = (sim and sim.enemies) or self:CountEnemiesInRange()
-
-    s.opt = function(name) return ns:Opt(name) end
-    s.known = function(name) return ns:Known(name) end
-    s.cdRemain = function(name) return math.max(0, (readyAt[name] or 0) - now) end
-    s.onGCD = function(name)
-        local sp = ns.spells[name]
-        return sp and sp.gcd > 0
-    end
-    s.usable = function(name)
-        local sp = ns.spells[name]
-        if not sp then return false, false end
-        local usable, noMana = safe(C_Spell.IsSpellUsable, sp.id)
-        return usable and true or false, noMana and true or false
-    end
-    s.inRange = function(name)
-        local sp = ns.spells[name]
-        if not sp or not s.hasTarget then return nil end
-        return safe(C_Spell.IsSpellInRange, sp.id, "target")
-    end
-    -- Buff-Gruppe: aktiver Name und Restzeit (geschätzt im Kampf, exakt außerhalb)
-    s.buff = function(group)
-        local b = buffs[group]
-        if not b or not b.name then return nil, 0 end
-        return b.name, math.max(0, b.expires - now)
-    end
-    -- Eigener Debuff/DoT auf dem aktuellen Ziel: Name und Restzeit (mitgezählt)
-    s.debuff = function(group)
-        local d = debuffs[group]
-        if not d or not d.name or d.expires <= now then return nil, 0 end
-        return d.name, d.expires - now
-    end
-    -- Zauber scheitert gerade nur an Mana/Wut/Energie
-    s.oom = function(name)
-        local usable, noMana = s.usable(name)
-        return (not usable) and noMana
-    end
     return s
 end
 
@@ -1189,9 +1263,11 @@ function ns:Predict(count, horizon, base)
     -- und neu bewerten. So erscheinen auch zeitabhängige Regeln (z. B. "Siegel
     -- läuft aus") an der richtigen Stelle.
     local steps = 0
+    local snap = {}   -- eine Tabelle für alle Schritte (spart Müll für die Speicherbereinigung)
+    sim.hookSnap = {}
     while #result < count and steps < 120 do
         steps = steps + 1
-        local s = self:Snapshot(sim)
+        local s = self:Snapshot(sim, snap)
         local rule, ready, noMana = self:Recommend(s)
         if not rule then break end
         ready = ready or 0
@@ -1218,7 +1294,7 @@ function ns:SimulateCast(sim, name, at)
     if sp and sp.gcd > 0 then sim.gcdEnd = at + sp.gcd end
     sim.combo = applyCast(self.rotation, name, at, sim.buffs, sim.debuffs, sim.combo or 0)
     if self.rotation.hooks.onCast then
-        pcall(self.rotation.hooks.onCast, name, self:Snapshot(sim), sim.custom)
+        pcall(self.rotation.hooks.onCast, name, self:Snapshot(sim, sim.hookSnap), sim.custom)
     end
     -- Schutz vor Endlosschleifen bei Zaubern ohne Cooldown und GCD
     if cd <= 0 and not (sp and sp.gcd > 0) then sim.t = sim.t + 0.5 end
@@ -1383,6 +1459,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
         if hooks and hooks.onTargetChanged then hooks.onTargetChanged(ns.custom) end
     elseif event == "SPELLS_CHANGED" then
         ns:ResolveSpells()
+        if ns.CDM then ns.CDM:Reset() end
     elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
         ns:UpdateRotation()
     elseif event == "ACTIONBAR_SLOT_CHANGED" or event == "UPDATE_BINDINGS" then
@@ -1420,6 +1497,22 @@ local function printState()
         print(string.format(L["  Combo-Punkte: %d (%s)"], s.combo, s.comboExact and L["exakt"] or L["geschätzt"]))
     end
     if s.form then print(L["  Gestalt/Haltung: "] .. ns:SpellName(s.form)) end
+    if ns.CDM then
+        local c = ns.CDM.cdCheck
+        print(string.format(L["  Cooldown-Manager: %s | Cooldown-Prüfung: %s (%d passend, %d abweichend)"],
+            ns.CDM:Enabled() and L["an"] or L["aus"], ns.CDM:CooldownTrusted() and L["aktiv"] or L["noch nicht bestätigt"],
+            c.agree, c.disagree))
+        for group, def in pairs(ns.rotation.buffGroups) do
+            for _, name in ipairs(def.spells) do
+                local st = ns.CDM:State(name)
+                if st ~= nil then
+                    local n, more = ns.CDM:Stacks(name)
+                    print(string.format(L["    CDM %s: %s, Stapel %s"], ns:SpellName(name), st and L["aktiv"] or L["aus"],
+                        tostring(n) .. (more and "+" or "")))
+                end
+            end
+        end
+    end
     local names = {}
     for name in pairs(ns.spells) do names[#names + 1] = name end
     table.sort(names)

@@ -45,6 +45,22 @@ local function collectButtons()
     for bar = 1, 15 do                       -- ElvUI
         for i = 1, 12 do add(_G["ElvUI_Bar" .. bar .. "Button" .. i]) end
     end
+    -- Alle Leisten-Addons mit LibActionButton (z. B. weitere Bartender-/ElvUI-Varianten,
+    -- KkthnxUI, AzeriteUI): die Bibliothek führt eine Liste ihrer Knöpfe.
+    if LibStub then
+        for _, libName in ipairs({ "LibActionButton-1.0", "LibActionButton-1.0-ElvUI" }) do
+            local ok, lab = pcall(LibStub, libName, true)
+            if ok and type(lab) == "table" then
+                for _, reg in ipairs({ lab.buttonRegistry, lab.activeButtons }) do
+                    if type(reg) == "table" then
+                        for b in pairs(reg) do
+                            if type(b) == "table" then add(b) end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 -- Aktionsplatz eines Knopfs (Blizzard: .action, LibActionButton: _state_action)

@@ -798,6 +798,7 @@ function Display:Update()
     -- Dungeon betreten/verlassen: Größe anpassen
     if ns:InInstance() ~= self.inInstance then self:ApplySettings() return end
 
+    ns:CombatSync()   -- Cooldown-Manager/Cooldown-Trick korrigieren den Schattenzustand
     local s = ns:Snapshot()
     self:UpdateReminders(s)
     local preview = self:PreviewActive()

@@ -121,6 +121,8 @@ Nur Werte, die in Forever **im Kampf lesbar** sind (gemessen mit ForeverProbe):
 | `s.hasPet` | Begleiter da und lebt |
 | `s.power`, `s.powerMax` | Wut/Energie/Mana – `nil`, wenn im Kampf geheim |
 | `s.oom(name)` | Zauber scheitert gerade nur an Mana/Wut/Energie |
+| `s.cdm(name)` | Blizzard-Cooldown-Manager: true = Aura aktiv, false = sicher aus, nil = unbekannt (nicht im CDM / Vorhersage). Nur Auren, die der Spieler im CDM verfolgt |
+| `s.cdmStacks(name)` | Stapel laut CDM und ob nur "mindestens" (im Kampf: 1 oder 2+); nil = unbekannt |
 
 **Nicht** verfügbar (im Kampf geheim): Leben/Mana in Zahlen, Auren-Inhalte, echte Cooldown-Zeiten, Kampflog.
 
