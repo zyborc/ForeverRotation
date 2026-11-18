@@ -1036,9 +1036,9 @@ function ns:CombatSync()
         end
     end
 
-    -- Cooldowns: nur ja/nein, und nur wenn der Trick vorher geprüft wurde und kein GCD läuft
-    -- (sonst ist unklar, ob "läuft" den GCD meint).
-    if self.CDM:CooldownTrusted() and now > state.gcdEnd + 0.05 then
+    -- Cooldowns: nur ja/nein, und nur wenn der Trick vorher geprüft wurde. Während des GCD nur,
+    -- wenn bestätigt ist, dass der Trick den GCD ausblendet (sonst hieße "läuft" vielleicht nur GCD).
+    if self.CDM:CooldownTrusted() and (self.CDM:IgnoresGCD() or now > state.gcdEnd + 0.05) then
         for name, sp in pairs(self.spells) do
             if sp.known and self:CooldownOf(name) > 1.6 then
                 local onCD = self.CDM:OnCooldown(sp.id)

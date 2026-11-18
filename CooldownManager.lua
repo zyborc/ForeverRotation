@@ -61,6 +61,7 @@ local function infoKeys(item)
         if k then keys[#keys + 1] = k end
     end
     add(getField(info, "spellID"))
+    keys.base = keys[1]   -- Grundzauber des Symbols (beim Siegel der Platzhalter "Seals")
     add(getField(info, "overrideSpellID"))
     add(getField(info, "overrideTooltipSpellID"))
     local linked = getField(info, "linkedSpellIDs")
@@ -111,21 +112,36 @@ function CDM:Scan()
                     if type(item.GetAuraDataUnit) == "function" then
                         local ok, unit = pcall(item.GetAuraDataUnit, item)
                         if ok and not isSecret(unit) then
+                            -- Alle Zauber, die das Symbol abdeckt (Siegel-Symbol: alle Siegel, über die
+                            -- Cooldown-ID; im Kampf lesbar). Dazu früher darauf gesehene Auren.
+                            local cover = infoKeys(item) or {}
                             local seen = seenOnItem[item]
-                            if unit ~= nil then
-                                local keys = {}
+                            if unit == nil then
+                                -- keine Aura auf dem Symbol: alles Abgedeckte ist sicher aus
+                                mark(cover, false)
+                                if seen then
+                                    for k in pairs(seen) do tracked[k] = true end
+                                end
+                            elseif unit == "player" then
+                                -- WELCHE Aura: nur lesbar, wenn sie vor dem Kampf gesetzt wurde. Im Kampf
+                                -- neu gesetzt ist die Zauber-ID geheim -> "irgendeine liegt", also unbekannt.
                                 local k1 = keyOfId(safe(item.GetSpellID, item))
-                                local k2 = type(item.GetAuraSpellID) == "function" and keyOfId(safe(item.GetAuraSpellID, item))
-                                if k1 then keys[#keys + 1] = k1 end
-                                if k2 and k2 ~= k1 then keys[#keys + 1] = k2 end
-                                if not seen then seen = {}; seenOnItem[item] = seen end
-                                for _, k in ipairs(keys) do seen[k] = true end
-                                mark(keys, true, readStacks(item))
+                                local k2 = type(item.GetAuraSpellID) == "function"
+                                    and keyOfId(safe(item.GetAuraSpellID, item)) or nil
+                                local k = k2 or k1
+                                -- Platzhalter ("Seals") sagt nicht, welche Aura liegt
+                                if k and k == cover.base and #cover > 1 then k = nil end
+                                if k then
+                                    if not seen then seen = {}; seenOnItem[item] = seen end
+                                    seen[k] = true
+                                    mark(cover, false)
+                                    if seen then
+                                        for s in pairs(seen) do tracked[s] = true end
+                                    end
+                                    mark({ k }, true, readStacks(item))
+                                end
                             end
-                            -- schon einmal auf diesem Symbol gesehene Auren sind jetzt sicher aus
-                            if seen then
-                                for k in pairs(seen) do tracked[k] = true end
-                            end
+                            -- unit "target": Aura auf dem Ziel (z. B. Betäubung) – kein eigener Buff
                         end
                     end
                 else
@@ -177,7 +193,7 @@ end
 local scratch            -- verstecktes Cooldown-Frame; false = nicht verfügbar
 local passGCDFlag = true -- GetSpellCooldownDuration(id, true) = ohne GCD (falls unterstützt)
 
-local check = { agree = 0, disagree = 0, onAgree = 0, offAgree = 0 }
+local check = { agree = 0, disagree = 0, onAgree = 0, offAgree = 0, gcdAgree = 0, gcdDisagree = 0 }
 CDM.cdCheck = check
 
 local function getScratch()
@@ -221,6 +237,12 @@ function CDM:CooldownTrusted()
     return check.onAgree >= 2 and check.offAgree >= 3 and check.disagree * 20 <= check.agree
 end
 
+-- Blendet der Trick den GCD aus? (gemessen 18.11.: ja, mit GetSpellCooldownDuration(id, true))
+-- Dann darf auch während des GCD geprüft werden.
+function CDM:IgnoresGCD()
+    return passGCDFlag and check.gcdAgree >= 2 and check.gcdDisagree == 0
+end
+
 -- Außerhalb des Kampfs: Trick gegen den echten Cooldown halten (duration lesbar).
 local lastCalib = -1
 function CDM:Calibrate(spells)
@@ -234,6 +256,12 @@ function CDM:Calibrate(spells)
             local duration = getField(info, "duration")
             local expected
             if duration == 0 then expected = false elseif type(duration) == "number" and duration > 1.6 then expected = true end
+            if type(duration) == "number" and duration > 0 and duration <= 1.6 and getField(info, "isOnGCD") == true then
+                -- nur der GCD läuft: Der Trick sollte "frei" melden
+                local got = self:OnCooldown(sp.id)
+                if got == false then check.gcdAgree = check.gcdAgree + 1
+                elseif got == true then check.gcdDisagree = check.gcdDisagree + 1 end
+            end
             if expected ~= nil then
                 local got = self:OnCooldown(sp.id)
                 if got ~= nil then
