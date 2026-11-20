@@ -810,9 +810,16 @@ function Display:Update()
         f.timeline:Hide()
         self.currentRule, self.currentReady = nil, false
         if ns.ActionGlow then ns.ActionGlow:Update(nil) end
+        if ns.Overlay then ns.Overlay:Hide() end
         return
     end
     f:SetAlpha((s.inCombat or not g.locked or preview) and 1 or (g.alphaOOC or 0.6))
+    if ns.Overlay then
+        -- Effekt am Charakter (z. B. Seal Twisting); Vorführung auch im Rotations-Reiter (dort die Optionen)
+        local C = ns.Config
+        local demo = preview or (C and C.frame and C.frame:IsShown() and C.tab == "rotation") or false
+        ns.Overlay:Update(s, demo)
+    end
 
     local rule, ready, noMana = ns:Recommend(s)
 

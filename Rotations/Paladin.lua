@@ -289,6 +289,50 @@ local function twistTarget(s)
     return partner
 end
 
+-- Effekt am Charakter: Rauten = gespeicherte Kopien in der Farbe ihres Siegels,
+-- Bögen + Symbol in der Farbe des Zielsiegels, sobald gewechselt werden soll.
+local SEAL_COLOR = {
+    ["Seal of Command"]       = { 1.00, 0.55, 0.10 },   -- glühendes Orange
+    ["Seal of Righteousness"] = { 0.35, 0.75, 1.00 },   -- helles Blau
+}
+local fx = { max = 3 }
+
+local function setFx(d, count, atLeast, estimated, from, to, ready)
+    local c, t = SEAL_COLOR[from] or SEAL_COLOR["Seal of Command"], SEAL_COLOR[to] or SEAL_COLOR["Seal of Righteousness"]
+    d.count, d.atLeast, d.estimated, d.ready = count, atLeast, estimated, ready
+    d.r, d.g, d.b = c[1], c[2], c[3]
+    d.tr, d.tg, d.tb = t[1], t[2], t[3]
+    d.spell = to
+    return d
+end
+
+local function twistOverlay(s, demo)
+    if not s.opt("twistFx") then return nil end
+    fx.scale = s.opt("twistFxScale") or 1
+    if demo then
+        -- Vorführung in den Einstellungen: Command sammelt 3 Kopien, Wechsel, dann Righteousness
+        local t = s.now % 12
+        local from = t < 6 and "Seal of Command" or "Seal of Righteousness"
+        local phase = t % 6
+        return setFx(fx, math.min(3, math.floor(phase / 1.4)), false, false, from, TWIST_PARTNER[from], phase >= 4.2)
+    end
+    if not (s.inCombat and twistActive(s)) then return nil end
+    local active = sealActive(s)
+    local partner = TWIST_PARTNER[active]
+    if not partner then return nil end
+    local age = sealAge(s)
+    local n, more
+    if s.opt("twistCDM") then n, more = s.cdmStacks("Unsealed Wrath") end
+    local estimated = n == nil
+    if estimated then
+        n, more = math.min(3, math.floor(age / s.swingSpeed)), false
+    elseif age < s.swingSpeed + 0.3 then
+        n, more = 0, false          -- bis zum ersten Schlag zeigt das Symbol noch die alten Kopien
+    end
+    n = math.min(n, 3)
+    return setFx(fx, n, more and n < 3, estimated, active, partner, twistTarget(s) ~= nil)
+end
+
 -- Beim Twisten zählt jedes Siegel des Paares als "Schadenssiegel aktiv".
 local function needDamageSeal(s, name)
     if s.inCombat and twistActive(s) then
@@ -374,9 +418,13 @@ ns:RegisterRotation({
                         desc = "{Unsealed Wrath} speichert bis zu 3 Kopien. Gezählt wird über den Cooldown-Manager (siehe nächste Option), sonst über deine Waffengeschwindigkeit geschätzt (außerhalb des Kampfs gemessen)." },
         twistCDM = { order = 7, default = true, label = "Kopien aus dem Cooldown-Manager",
                      desc = "Liest die gespeicherten Kopien von {Unsealed Wrath} aus dem Blizzard-Cooldown-Manager (Buff-Symbole, Bearbeitungsmodus). 1 Kopie ist genau erkennbar, ab 2 nur „mindestens 2“ – die dritte wird dann über die Zeit geschätzt. Ist {Unsealed Wrath} dort nicht eingetragen, wird nur geschätzt." },
+        twistFx  = { order = 8, default = true, label = "Twist-Effekt am Charakter",
+                     desc = "Zeigt die gespeicherten Kopien als Rauten unter deinem Charakter – orange für {Seal of Command}, blau für {Seal of Righteousness}. Ist der Wechsel fällig, leuchten Bögen links und rechts in der Farbe des Zielsiegels und sein Symbol erscheint. Blasse Rauten = nur geschätzt, flackernde Raute = vielleicht schon da. Bei offenen Einstellungen läuft eine Vorführung." },
+        twistFxScale = { order = 9, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe des Twist-Effekts" },
     }),
 
     rules = retRules,
+    overlay = twistOverlay,
 
     hooks = {
         onReset = function(custom) custom.crusaderTargets = {} end,
