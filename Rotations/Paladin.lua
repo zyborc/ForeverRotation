@@ -359,6 +359,7 @@ ns:RegisterRotation({
         echoFxScale = { order = 8, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe der Echo-Anzeige" },
         echoFxY  = { order = 9, default = 0, min = -200, max = 300, step = 10, label = "Höhe der Echo-Anzeige",
                      desc = "Verschiebt die Anzeige nach oben (+) oder unten (−)." },
+        echoFxAlpha = { order = 10, default = 1, min = 0.2, max = 1, step = 0.05, label = "Deckkraft der Echo-Anzeige" },
     }),
 
     rules = retRules,

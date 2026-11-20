@@ -198,15 +198,18 @@ local function build(styleKey)
     local st = STYLES[styleKey]
     local info = { status = {} }
     containers[styleKey] = info
-    local ok, c = pcall(CreateFrame, "AuraContainer", nil, UIParent, "CustomAuraContainerTemplate")
+    -- In der Welt-Ebene (wie die Namensplaketten) und dort ganz unten: Lebensleisten über Gegnern
+    -- liegen dann ÜBER der Anzeige statt von ihr verdeckt zu werden.
+    local ok, c = pcall(CreateFrame, "AuraContainer", nil, WorldFrame, "CustomAuraContainerTemplate")
     if not ok or not c then
         info.failed = "AuraContainer: " .. tostring(c)
         return
     end
     info.frame = c
     c:SetSize(st.w, st.h)
-    c:SetPoint("CENTER", UIParent, "CENTER", st.x, st.y)
+    c:SetPoint("CENTER", WorldFrame, "CENTER", st.x, st.y)
     c:SetFrameStrata("BACKGROUND")
+    c:SetFrameLevel(0)
     c:EnableMouse(false)
     c:Hide()
     local okU, errU = pcall(c.SetUnit, c, "player")
@@ -271,14 +274,19 @@ function Echo:Refresh()
     end
     local info = active and containers[active]
     if info and info.frame then
+        -- Größe wie auf der Oberfläche: WorldFrame hat keine UI-Skalierung, also ausgleichen
         local scale = ns:Opt("echoFxScale") or 1
-        if info.frame:GetScale() ~= scale then info.frame:SetScale(scale) end
+        local uiFactor = UIParent:GetEffectiveScale() / math.max(0.01, WorldFrame:GetEffectiveScale())
+        local total = scale * uiFactor
+        if math.abs(info.frame:GetScale() - total) > 0.001 then info.frame:SetScale(total) end
+        local alpha = ns:Opt("echoFxAlpha") or 1
+        if math.abs(info.frame:GetAlpha() - alpha) > 0.001 then info.frame:SetAlpha(alpha) end
         local st = STYLES[active]
         local y = (st.y + (ns:Opt("echoFxY") or 0)) / scale
         if info.y ~= y then
             info.y = y
             info.frame:ClearAllPoints()
-            info.frame:SetPoint("CENTER", UIParent, "CENTER", st.x / scale, y)
+            info.frame:SetPoint("CENTER", WorldFrame, "CENTER", st.x / scale, y)
         end
     end
 end

@@ -237,6 +237,7 @@ add({
     ["Bögen"] = "Arcs",
     ["Eigene Grafik (Custom-Ordner)"] = "Own graphic (Custom folder)",
     ["Höhe der Echo-Anzeige"] = "Echo display height",
+    ["Deckkraft der Echo-Anzeige"] = "Echo display opacity",
     ["Verschiebt die Anzeige nach oben (+) oder unten (−)."] = "Moves the display up (+) or down (−).",
     ["Klinge des Lichts"] = "Blade of Light",
     ["Echo-Bogen"] = "Echo arch",
