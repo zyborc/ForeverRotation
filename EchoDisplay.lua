@@ -14,13 +14,30 @@ local Echo = {}
 ns.EchoDisplay = Echo
 
 local TEX = "Interface\\AddOns\\ForeverRotation\\Textures\\"
+local CUSTOM = "Interface\\AddOns\\ForeverRotation\\Custom\\"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
 -- Stile: Texturgröße (tw, th), Anzeigegröße (w, h), Lage zum Charakter, Füllbereich in Textur-Pixeln.
 --   base     Grundbild ab der 1. Kopie (tintBase = in Siegelfarbe einfärben)
 --   fill     wird von unten nach oben (bzw. links nach rechts) freigegeben
 --   glow     Schein bei 3 Kopien
+-- Stufen-Stile (stages): je Stufe ein Slot, den das Spiel erst ab `min` Stapeln zeigt. Teile:
+--   file, color ("seal" = Siegelfarbe, "target" = Zielfarbe, nil = Originalfarben), alpha, add (ADD-Mischung)
 local STYLES = {
+    custom = {   -- eigene Grafik aus ForeverRotation/Custom/ (tools/echo_custom.py), nicht im Repo
+        dir = CUSTOM, w = 400, h = 200, x = 0, y = 90,
+        stages = {
+            { min = 1, parts = {
+                { file = "echo_custom_left", alpha = 0.25 }, { file = "echo_custom_right", alpha = 0.25 },
+                { file = "echo_custom_glowl", color = "seal", alpha = 0.6, add = true },
+                { file = "echo_custom_left" } } },
+            { min = 2, parts = {
+                { file = "echo_custom_glowr", color = "seal", alpha = 0.6, add = true },
+                { file = "echo_custom_right" } } },
+            { min = 3, parts = {
+                { file = "echo_custom_glow", color = "target", alpha = 0.9, add = true } } },
+        },
+    },
     arcs = {
         tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
         base = "echo_edge", tintBase = true, fill = "echo_arcs", glow = "echo_glow",
@@ -121,6 +138,31 @@ local function initStacks(button, e, st, container)
     button:SetApplicationBar(bar, { maxApplications = 3, interpolation = interp() })
 end
 
+-- Stufen-Slot: Teile, die das Spiel erst ab `stage.min` Stapeln zeigt
+local function initStage(button, e, st, container, stage)
+    button:EnableMouse(false)
+    button:ClearAllPoints()
+    button:SetPoint("CENTER", container, "CENTER")
+    button:SetSize(st.w, st.h)
+    local bar = CreateFrame("StatusBar", nil, button)
+    bar:SetAllPoints(button)
+    bar:SetStatusBarTexture(WHITE)
+    bar:SetStatusBarColor(0, 0, 0, 0)
+    for i, part in ipairs(stage.parts) do
+        local t = bar:CreateTexture(nil, "ARTWORK", nil, math.min(7, i - 1))
+        t:SetTexture((st.dir or TEX) .. part.file)
+        t:SetAllPoints(button)
+        if part.add then t:SetBlendMode("ADD") end
+        local c = part.color == "seal" and e.color or part.color == "target" and e.full or nil
+        if c then
+            t:SetVertexColor(c[1], c[2], c[3], part.alpha or 1)
+        else
+            t:SetVertexColor(1, 1, 1, part.alpha or 1)
+        end
+    end
+    button:SetApplicationBar(bar, { minApplications = stage.min, maxApplications = math.max(stage.min, 3) })
+end
+
 -- Slot "voll": Leuchten und volle Füllung in Zielfarbe, nur ab 3 Stapeln (entscheidet das Spiel)
 local function initFull(button, e, st, container)
     button:EnableMouse(false)
@@ -168,12 +210,12 @@ local function build(styleKey)
     pcall(c.SetEnabled, c, false)
 
     local n = 0
-    local function addSlot(key, spellID, init, e)
+    local function addSlot(key, spellID, init, e, extra)
         local initErr
         local okA, err = pcall(c.AddAuraSlot, c, key, "HELPFUL", {
             candidateFilters = { includeSpellIDs = { [spellID] = true } },
             initializeFrame = function(button)
-                local okI, errI = pcall(init, button, e, st, c)
+                local okI, errI = pcall(init, button, e, st, c, extra)
                 if not okI then initErr = errI end
             end,
         })
@@ -185,8 +227,12 @@ local function build(styleKey)
         n = n + 1
     end
     for _, e in ipairs(ECHOES) do
-        addSlot("s" .. e.id, e.id, initStacks, e)
-        addSlot("f" .. e.id, e.id, initFull, e)
+        if st.stages then
+            for i, stage in ipairs(st.stages) do addSlot("t" .. i .. "_" .. e.id, e.id, initStage, e, stage) end
+        else
+            addSlot("s" .. e.id, e.id, initStacks, e)
+            addSlot("f" .. e.id, e.id, initFull, e)
+        end
     end
     table.insert(info.status, 1, n .. " Slots angelegt")
 end
@@ -222,6 +268,13 @@ function Echo:Refresh()
     if info and info.frame then
         local scale = ns:Opt("echoFxScale") or 1
         if info.frame:GetScale() ~= scale then info.frame:SetScale(scale) end
+        local st = STYLES[active]
+        local y = (st.y + (ns:Opt("echoFxY") or 0)) / scale
+        if info.y ~= y then
+            info.y = y
+            info.frame:ClearAllPoints()
+            info.frame:SetPoint("CENTER", UIParent, "CENTER", st.x / scale, y)
+        end
     end
 end
 
