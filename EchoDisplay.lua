@@ -28,14 +28,17 @@ local STYLES = {
         dir = CUSTOM, w = 400, h = 200, x = 0, y = 90,
         stages = {
             { min = 1, parts = {
-                { file = "echo_custom_left", alpha = 0.25 }, { file = "echo_custom_right", alpha = 0.25 },
-                { file = "echo_custom_glowl", color = "seal", alpha = 0.6, add = true },
-                { file = "echo_custom_left" } } },
+                { file = "echo_custom_p1", alpha = 0.25 }, { file = "echo_custom_p2", alpha = 0.25 },
+                { file = "echo_custom_p3", alpha = 0.25 },
+                { file = "echo_custom_g1", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_p1" } } },
             { min = 2, parts = {
-                { file = "echo_custom_glowr", color = "seal", alpha = 0.6, add = true },
-                { file = "echo_custom_right" } } },
+                { file = "echo_custom_g2", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_p2" } } },
             { min = 3, parts = {
-                { file = "echo_custom_glow", color = "target", alpha = 0.9, add = true } } },
+                { file = "echo_custom_g3", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_p3" },
+                { file = "echo_custom_glow", color = "target", alpha = 0.35, add = true } } },
         },
     },
     arcs = {
