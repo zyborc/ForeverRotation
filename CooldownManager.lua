@@ -30,6 +30,10 @@ local atLeast = {}   -- [Schlüssel] = true: Stapelzahl ist geheim, nur "mindest
 local seenOnItem = setmetatable({}, { __mode = "k" })   -- [Symbol] = { [Schlüssel] = true }
 local infoCache = {} -- [cooldownID] = { Schlüssel, ... }
 local lastScan = -1
+-- Wann kamen die Stapel? Bleibt über Scans erhalten (Übergänge 0 -> 1 -> "ab 2").
+local prevLevel = {} -- [Schlüssel] = 0, 1 oder 2 (= ab 2) beim letzten Scan
+local rise1 = {}     -- [Schlüssel] = Zeit, seit der 1 Stapel liegt
+local rise2 = {}     -- [Schlüssel] = Zeit, seit der mindestens 2 Stapel liegen
 
 local function keyOfId(id)
     if type(id) ~= "number" or isSecret(id) then return nil end
@@ -100,7 +104,7 @@ end
 
 function CDM:Scan()
     local now = GetTime()
-    if now - lastScan < 0.2 then return end
+    if now - lastScan < 0.1 then return end
     lastScan = now
     wipe(active); wipe(tracked); wipe(stacks); wipe(atLeast)
     if not self:Enabled() then return end
@@ -161,6 +165,25 @@ function CDM:Scan()
             end
         end
     end
+    -- Übergänge der Stapel festhalten (jeder Anstieg = ein Treffer)
+    for k in pairs(tracked) do
+        local level = active[k] and math.min(2, (atLeast[k] and 2) or stacks[k] or 1) or 0
+        local prev = prevLevel[k] or 0
+        if level == 0 then
+            rise1[k], rise2[k] = nil, nil
+        elseif level == 1 and prev ~= 1 then
+            rise1[k], rise2[k] = now, nil
+        elseif level == 2 and prev < 2 then
+            rise2[k] = now
+        end
+        prevLevel[k] = level
+    end
+end
+
+-- Seit wann liegen 1 bzw. mindestens 2 Stapel? (nil = unbekannt / nicht so)
+function CDM:StackTimes(key)
+    self:Scan()
+    return rise1[key], rise2[key]
 end
 
 -- true = aktiv, false = vom CDM verfolgt und sicher aus, nil = unbekannt

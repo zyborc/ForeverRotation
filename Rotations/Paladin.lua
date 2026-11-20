@@ -263,21 +263,36 @@ local function twistInterval(s)
     return math.min(14, s.opt("twistSwings") * s.swingSpeed)  -- Kopien halten 15 s
 end
 
+-- Kopien des AKTIVEN Siegels laut Cooldown-Manager. Das Symbol zeigt nach einem Wechsel noch
+-- die alten Kopien, bis ein Treffer sie auslöst – gezählt wird daher nur, was nach dem
+-- Siegelwechsel dazugekommen ist (Anstieg auf 1 bzw. auf "ab 2" danach).
+-- Rückgabe: Kopien (0–3), nur "mindestens"?, Zeit des 2. Treffers; nil = kein CDM-Wert.
+local function freshCopies(s)
+    if not s.opt("twistCDM") then return nil end
+    local n, more = s.cdmStacks("Unsealed Wrath")
+    if n == nil then return nil end
+    if n == 0 then return 0, false end
+    local since = math.max(s.custom.sealSince or 0, s.combatStart or 0)
+    local t1, t2 = s.cdmStackTimes("Unsealed Wrath")
+    if n >= 2 then
+        if t2 and t2 > since then
+            if more and s.now >= t2 + s.swingSpeed - 0.1 then return 3, true, t2 end  -- 3. Schlag gelandet
+            return math.min(n, 3), more, t2
+        end
+        return (t1 and t1 > since) and 1 or 0, false
+    end
+    return (t1 and t1 > since) and 1 or 0, false
+end
+
 -- Genug Kopien gesammelt, um zu wechseln?
 local function twistReady(s)
     local age, interval = sealAge(s), twistInterval(s)
-    local n, more
-    if s.opt("twistCDM") then n, more = s.cdmStacks("Unsealed Wrath") end
+    local n = freshCopies(s)
     if n == nil then return age >= interval end           -- kein CDM-Wert (oder Vorhersage): schätzen
-    if n == 0 then return false end                       -- nichts gespeichert: Wechsel brächte nichts
+    if n == 0 then return false end                       -- nichts Neues gespeichert: Wechsel brächte nichts
     if age >= 14 then return true end                     -- Kopien halten 15 s: spätestens jetzt
-    -- Nach dem Wechsel zeigt das Symbol bis zum ersten Schlag noch die Kopien des alten Siegels
-    if age < s.swingSpeed + 0.3 then return false end
-    local want = s.opt("twistSwings")
-    if want <= 1 then return n >= 1 end
-    if want == 2 then return n >= 2 end
-    if not more then return n >= 3 end                    -- Zahl lesbar
-    return n >= 2 and age >= interval - 0.5               -- "ab 2": dritte Kopie über die Zeit schätzen
+    -- "ab 2" ist geheim: die 3. Kopie gilt eine Waffengeschwindigkeit nach dem 2. Treffer als da
+    return n >= math.min(3, s.opt("twistSwings"))
 end
 
 -- Siegel, auf das jetzt gewechselt werden soll (oder nil)
@@ -289,8 +304,8 @@ local function twistTarget(s)
     return partner
 end
 
--- Effekt am Charakter: Rauten = gespeicherte Kopien in der Farbe ihres Siegels,
--- Bögen + Symbol in der Farbe des Zielsiegels, sobald gewechselt werden soll.
+-- Effekt am Charakter: Bogensegmente = gespeicherte Kopien in der Farbe ihres Siegels,
+-- alle Segmente in der Farbe des Zielsiegels, sobald gewechselt werden soll.
 local SEAL_COLOR = {
     ["Seal of Command"]       = { 1.00, 0.55, 0.10 },   -- glühendes Orange
     ["Seal of Righteousness"] = { 0.35, 0.75, 1.00 },   -- helles Blau
@@ -320,17 +335,10 @@ local function twistOverlay(s, demo)
     local active = sealActive(s)
     local partner = TWIST_PARTNER[active]
     if not partner then return nil end
-    local age = sealAge(s)
-    local n, more
-    if s.opt("twistCDM") then n, more = s.cdmStacks("Unsealed Wrath") end
+    local n = freshCopies(s)
     local estimated = n == nil
-    if estimated then
-        n, more = math.min(3, math.floor(age / s.swingSpeed)), false
-    elseif age < s.swingSpeed + 0.3 then
-        n, more = 0, false          -- bis zum ersten Schlag zeigt das Symbol noch die alten Kopien
-    end
-    n = math.min(n, 3)
-    return setFx(fx, n, more and n < 3, estimated, active, partner, twistTarget(s) ~= nil)
+    if estimated then n = math.min(3, math.floor(sealAge(s) / s.swingSpeed)) end
+    return setFx(fx, n, false, estimated, active, partner, twistTarget(s) ~= nil)
 end
 
 -- Beim Twisten zählt jedes Siegel des Paares als "Schadenssiegel aktiv".
@@ -417,7 +425,7 @@ ns:RegisterRotation({
         twistSwings = { order = 6, default = 3, min = 1, max = 3, step = 1, label = "Twisten nach Schlägen",
                         desc = "{Unsealed Wrath} speichert bis zu 3 Kopien. Gezählt wird über den Cooldown-Manager (siehe nächste Option), sonst über deine Waffengeschwindigkeit geschätzt (außerhalb des Kampfs gemessen)." },
         twistCDM = { order = 7, default = true, label = "Kopien aus dem Cooldown-Manager",
-                     desc = "Liest die gespeicherten Kopien von {Unsealed Wrath} aus dem Blizzard-Cooldown-Manager (Buff-Symbole, Bearbeitungsmodus). 1 Kopie ist genau erkennbar, ab 2 nur „mindestens 2“ – die dritte wird dann über die Zeit geschätzt. Ist {Unsealed Wrath} dort nicht eingetragen, wird nur geschätzt." },
+                     desc = "Liest die gespeicherten Kopien von {Unsealed Wrath} aus dem Blizzard-Cooldown-Manager (Buff-Symbole, Bearbeitungsmodus). Gezählt wird nur, was nach dem letzten Siegelwechsel dazukam. 1 und 2 Kopien sind genau erkennbar; die dritte gilt eine Waffengeschwindigkeit nach dem 2. Treffer als da. Ist {Unsealed Wrath} dort nicht eingetragen, wird nur geschätzt." },
         twistFx  = { order = 8, default = true, label = "Twist-Effekt am Charakter",
                      desc = "Ab der ersten gespeicherten Kopie erscheinen links und rechts von deinem Charakter Bögen aus drei Segmenten. Jede Kopie füllt ein Segment von unten nach oben und lässt es kurz aufblitzen – orange für {Seal of Command}, blau für {Seal of Righteousness}. Ist der Wechsel fällig, sind alle Segmente in der Farbe des Zielsiegels gefüllt. Blasse Bögen = nur geschätzt. Bei offenen Einstellungen läuft eine Vorführung." },
         twistFxScale = { order = 9, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe des Twist-Effekts" },

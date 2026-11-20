@@ -1164,6 +1164,11 @@ local function attachQueries(s)
         if s._sim or not ns.CDM then return nil end
         return ns.CDM:Stacks(name)
     end
+    -- cdmStackTimes(name) = Zeitpunkt des Anstiegs auf 1 bzw. auf "ab 2" Stapel (Treffer messen)
+    s.cdmStackTimes = function(name)
+        if s._sim or not ns.CDM then return nil end
+        return ns.CDM:StackTimes(name)
+    end
 end
 
 -- Momentaufnahme für die Regeln. Alles, was eine Rotation abfragen darf, steht hier.
