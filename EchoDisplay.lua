@@ -26,10 +26,15 @@ local STYLES = {
         base = "echo_edge", tintBase = true, fill = "echo_arcs", glow = "echo_glow",
         vertical = true, from = 218, to = 38,
     },
-    sword = {
-        tw = 128, th = 512, w = 80, h = 320, x = 150, y = 0,
-        base = "echo_sword_base", fill = "echo_sword_fill", glow = "echo_sword_glow",
-        vertical = true, from = 350, to = 70,
+    runes = {
+        tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
+        base = "echo_runes_base", fill = "echo_runes_fill", glow = "echo_runes_glow",
+        vertical = true, from = 218, to = 38,
+    },
+    blade = {
+        tw = 256, th = 512, w = 120, h = 240, x = 160, y = 0,
+        base = "echo_blade_base", fill = "echo_blade_fill", glow = "echo_blade_glow",
+        vertical = true, from = 330, to = 70,
     },
     gems = {
         tw = 256, th = 64, w = 192, h = 48, x = 0, y = -125,
@@ -177,6 +182,7 @@ local function wantedStyle()
     if not (ns.rotation and ns.rotation.id == "PALADIN_RETRIBUTION") then return nil end
     local style = ns:Opt("echoFx")
     if style == true then style = "arcs" end      -- alte Einstellung (an/aus)
+    if style == "sword" then style = "blade" end  -- alter Stil
     return STYLES[style] and style or nil
 end
 

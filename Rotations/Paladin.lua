@@ -353,9 +353,9 @@ ns:RegisterRotation({
         twistSwings = { order = 6, default = 3, min = 1, max = 3, step = 1, label = "Twisten nach Schlägen",
                         desc = "{Unsealed Wrath} speichert bis zu 3 Kopien. Die Schläge werden über deine Waffengeschwindigkeit geschätzt (außerhalb des Kampfs gemessen)." },
         echoFx   = { order = 7, default = "arcs", label = "Echo-Anzeige am Charakter",
-                     values = { "arcs", "sword", "gems", "off" },
-                     valueLabels = { arcs = "Bögen", sword = "Schwert", gems = "Edelsteine", off = "aus" },
-                     desc = "Zeigt die gespeicherten Kopien von {Unsealed Wrath} – gezeichnet vom Spiel selbst, also genau wie im Spiel (auch im Kampf). Farbe = Siegel der Kopien, bei 3 Kopien leuchtet alles in der Farbe des Siegels, auf das du wechseln solltest.\nBögen = links und rechts vom Charakter, Schwert = Klinge rechts vom Charakter füllt sich, Edelsteine = drei Steine unter dem Charakter." },
+                     values = { "arcs", "runes", "blade", "gems", "off" },
+                     valueLabels = { arcs = "Bögen", runes = "Runenbogen", blade = "Klinge des Lichts", gems = "Edelsteine", off = "aus" },
+                     desc = "Zeigt die gespeicherten Kopien von {Unsealed Wrath} – gezeichnet vom Spiel selbst, also genau wie im Spiel (auch im Kampf). Farbe = Siegel der Kopien, bei 3 Kopien leuchtet alles in der Farbe des Siegels, auf das du wechseln solltest.\nBögen = schlichte Bögen links und rechts, Runenbogen = goldgefasste Bögen, Klinge des Lichts = Schwert rechts vom Charakter, dessen Runen-Kanal sich füllt, Edelsteine = drei Steine unter dem Charakter." },
         echoFxScale = { order = 8, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe der Echo-Anzeige" },
     }),
 
