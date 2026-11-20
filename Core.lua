@@ -1497,6 +1497,9 @@ local function printState()
         print(string.format(L["  Combo-Punkte: %d (%s)"], s.combo, s.comboExact and L["exakt"] or L["geschätzt"]))
     end
     if s.form then print(L["  Gestalt/Haltung: "] .. ns:SpellName(s.form)) end
+    if ns.EchoDisplay and ns.rotation.id == "PALADIN_RETRIBUTION" then
+        print(string.format(L["  Echo-Anzeige: %s"], ns.EchoDisplay:StatusText()))
+    end
     if ns.CDM then
         local c = ns.CDM.cdCheck
         print(string.format(L["  Cooldown-Manager: %s | Cooldown-Prüfung: %s (%d passend, %d abweichend)"],

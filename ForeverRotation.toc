@@ -5,7 +5,7 @@
 ## Author: Alex (zyborc)
 ## X-Website: https://github.com/zyborc/ForeverRotation
 ## X-License: MIT
-## Version: 0.17.0
+## Version: 0.18.0
 ## SavedVariables: ForeverRotationDB
 ## IconTexture: Interface\Icons\Spell_Holy_HolyBolt
 ## AddonCompartmentFunc: ForeverRotation_OnCompartmentClick
@@ -24,6 +24,7 @@ Rotations\Priest.lua
 Rotations\Shaman.lua
 Rotations\Druid.lua
 Display.lua
+EchoDisplay.lua
 ActionGlow.lua
 Coach.lua
 Config.lua
