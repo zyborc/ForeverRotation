@@ -360,6 +360,12 @@ ns:RegisterRotation({
         echoFxY  = { order = 9, default = 0, min = -200, max = 300, step = 10, label = "Höhe der Echo-Anzeige",
                      desc = "Verschiebt die Anzeige nach oben (+) oder unten (−)." },
         echoFxAlpha = { order = 10, default = 1, min = 0.2, max = 1, step = 0.05, label = "Deckkraft der Echo-Anzeige" },
+        echoFxColor = { order = 11, default = "gold", label = "Farbe der Echo-Anzeige",
+                        values = { "gold", "seal", "custom" },
+                        valueLabels = { gold = "Standard", seal = "Siegelfarbe", custom = "eigene Farbe" },
+                        desc = "Standard = Originalfarben der Grafik mit Schimmer in Siegelfarbe, Siegelfarbe = ganz in der Farbe des Siegels ({Seal of Command} orange, {Seal of Righteousness} blau), eigene Farbe = Farbe unten wählen." },
+        echoFxCustom = { order = 12, color = true, default = { r = 1, g = 0.85, b = 0.3 }, label = "Eigene Farbe der Echo-Anzeige",
+                         desc = "Gilt bei Farbe „eigene Farbe“." },
     }),
 
     rules = retRules,

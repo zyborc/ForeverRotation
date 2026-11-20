@@ -643,6 +643,45 @@ function Builder:dropdown(text, desc, values, get, set, display)
     return row
 end
 
+-- Farbwahl: Knopf mit Farbfeld, öffnet Blizzards Farbwähler. get/set liefern {r=, g=, b=}.
+function Builder:colorButton(text, desc, get, set)
+    local function cur()
+        local c = get() or {}
+        return c.r or c[1] or 1, c.g or c[2] or 1, c.b or c[3] or 1
+    end
+    local r, g, b = cur()
+    local swatch = string.format("|T%s:12:28:0:0:8:8:0:8:0:8:%d:%d:%d|t", WHITE, r * 255, g * 255, b * 255)
+    self:buttons({ {
+        text = T(text) .. "  " .. swatch, width = 300, desc = desc,
+        onClick = function()
+            local r0, g0, b0 = cur()
+            local function apply(nr, ng, nb)
+                set({ r = nr, g = ng, b = nb })
+                if ns.EchoDisplay then ns.EchoDisplay:Refresh() end
+            end
+            local picker = ColorPickerFrame
+            if not picker then return end
+            if picker.SetupColorPickerAndShow then
+                picker:SetupColorPickerAndShow({
+                    r = r0, g = g0, b = b0, hasOpacity = false,
+                    swatchFunc = function() apply(picker:GetColorRGB()) end,
+                    cancelFunc = function() apply(r0, g0, b0) end,
+                })
+            else
+                picker.func = function() apply(picker:GetColorRGB()) end
+                picker.cancelFunc = function() apply(r0, g0, b0) end
+                picker.hasOpacity = false
+                picker:SetColorRGB(r0, g0, b0)
+                picker:Show()
+            end
+            if not picker.frotHooked then   -- Feld im Knopf nach dem Schließen neu zeichnen
+                picker.frotHooked = true
+                picker:HookScript("OnHide", function() if Config.frame and Config.frame:IsShown() then Config:Build() end end)
+            end
+        end,
+    } })
+end
+
 -- Knöpfe nebeneinander: { { text, desc, onClick, width, accent, disabled } ... }
 function Builder:buttons(list)
     local x = INSET
@@ -1099,6 +1138,8 @@ local function buildRotationTab(b, g)
             b:check(text, o.desc, get, set)
         elseif type(o.default) == "number" then
             b:slider(text, o.desc, get, set, o.min, o.max, o.step)
+        elseif o.color then
+            b:colorButton(text, o.desc, get, set)
         end
     end
 end

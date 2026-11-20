@@ -25,7 +25,7 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 --   file, color ("seal" = Siegelfarbe, "target" = Zielfarbe, nil = Originalfarben), alpha, add (ADD-Mischung)
 local STYLES = {
     arch = {     -- Echo-Bogen: linker Bogen / Hammer mit Flügeln / rechter Bogen
-        w = 400, h = 200, x = 0, y = 90,
+        w = 400, h = 200, x = 0, y = 90, tintable = true,
         stages = {
             { min = 1, parts = {
                 { file = "echo_arch_p1", alpha = 0.25 }, { file = "echo_arch_p2", alpha = 0.25 },
@@ -42,7 +42,7 @@ local STYLES = {
         },
     },
     custom = {   -- eigene Grafik aus ForeverRotation/Custom/ (tools/echo_custom.py), nicht im Repo
-        dir = CUSTOM, w = 400, h = 200, x = 0, y = 90,
+        dir = CUSTOM, w = 400, h = 200, x = 0, y = 90, tintable = true,
         stages = {
             { min = 1, parts = {
                 { file = "echo_custom_p1", alpha = 0.25 }, { file = "echo_custom_p2", alpha = 0.25 },
@@ -82,8 +82,26 @@ local ECHOES = {
     { id = 1328206, color = { 0.30, 0.90, 0.90 },    full = GOLD },   -- Echo of Wisdom
 }
 
-local containers = {}   -- [Stil] = { frame = AuraContainer, status = "...", failed = "..." }
-local active             -- Stil, der gerade läuft
+local containers = {}   -- ["Stil|Farbe"] = { frame = AuraContainer, style = Stil, status = "...", failed = "..." }
+local active             -- Schlüssel des Containers, der gerade läuft
+
+-- Farbe der Anzeige (Option echoFxColor): "gold" = Originalfarben der Grafik + Schimmer in Siegelfarbe,
+-- "seal" = alles in Siegelfarbe, "custom" = alles in eigener Farbe (echoFxCustom).
+-- Wird beim Aufbau eines Containers festgelegt; ein Farbwechsel baut einen neuen Container.
+local cur = { mode = "gold" }
+
+local function colorSetting()
+    local mode = ns:Opt("echoFxColor") or "gold"
+    local c = ns:Opt("echoFxCustom")
+    local custom = type(c) == "table" and { c.r or c[1] or 1, c.g or c[2] or 1, c.b or c[3] or 1 } or { 1, 0.85, 0.3 }
+    local key = mode == "custom" and string.format("custom:%.2f,%.2f,%.2f", custom[1], custom[2], custom[3]) or mode
+    return mode, custom, key
+end
+
+-- Farbe der Kopien eines Siegels
+local function sealColor(e)
+    return cur.mode == "custom" and cur.custom or e.color
+end
 
 local function interp()
     return Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
@@ -102,7 +120,8 @@ local function initStacks(button, e, st, container)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
     button:SetSize(st.w, st.h)
-    local r, g, b = e.color[1], e.color[2], e.color[3]
+    local sc = sealColor(e)
+    local r, g, b = sc[1], sc[2], sc[3]
     local fx, fy = st.w / st.tw, st.h / st.th
 
     local base = texture(button, "BACKGROUND", 0, st.base, button)
@@ -154,10 +173,17 @@ local function initStage(button, e, st, container, stage)
     bar:SetStatusBarColor(0, 0, 0, 0)
     for i, part in ipairs(stage.parts) do
         local t = bar:CreateTexture(nil, "ARTWORK", nil, math.min(7, i - 1))
-        t:SetTexture((st.dir or TEX) .. part.file)
+        local file, c = part.file, nil
+        if part.color == "seal" then
+            c = sealColor(e)
+        elseif part.color == "target" then
+            c = e.full
+        elseif cur.mode ~= "gold" and st.tintable then
+            file, c = file .. "w", sealColor(e)      -- farblose Fassung, im Spiel eingefärbt
+        end
+        t:SetTexture((st.dir or TEX) .. file)
         t:SetAllPoints(button)
         if part.add then t:SetBlendMode("ADD") end
-        local c = part.color == "seal" and e.color or part.color == "target" and e.full or nil
         if c then
             t:SetVertexColor(c[1], c[2], c[3], part.alpha or 1)
         else
@@ -194,10 +220,11 @@ local function initFull(button, e, st, container)
     button:SetApplicationBar(bar, { minApplications = 3, maxApplications = 3 })
 end
 
-local function build(styleKey)
+local function build(key, styleKey, mode, custom)
     local st = STYLES[styleKey]
-    local info = { status = {} }
-    containers[styleKey] = info
+    local info = { status = {}, style = styleKey }
+    containers[key] = info
+    cur.mode, cur.custom = mode, custom
     -- In der Welt-Ebene (wie die Namensplaketten) und dort ganz unten: Lebensleisten über Gegnern
     -- liegen dann ÜBER der Anzeige statt von ihr verdeckt zu werden.
     local ok, c = pcall(CreateFrame, "AuraContainer", nil, WorldFrame, "CustomAuraContainerTemplate")
@@ -244,14 +271,16 @@ local function build(styleKey)
     table.insert(info.status, 1, n .. " Slots angelegt")
 end
 
--- Gewünschter Stil oder nil (nur Vergeltung mit Option an)
+-- Gewünschter Stil oder nil (nur Vergeltung mit Option an); dazu der Container-Schlüssel (Stil|Farbe)
 local function wantedStyle()
     if not (ns.rotation and ns.rotation.id == "PALADIN_RETRIBUTION") then return nil end
     local style = ns:Opt("echoFx")
     if style == true then style = "arcs" end      -- alte Einstellung (an/aus)
     if style == "sword" then style = "blade" end  -- alte Stile
     if style == "halo" or style == "runes" or style == "gems" then style = "arch" end
-    return STYLES[style] and style or nil
+    if not STYLES[style] then return nil end
+    local mode, custom, colorKey = colorSetting()
+    return style, style .. "|" .. colorKey, mode, custom
 end
 
 local function setShown(styleKey, on)
@@ -263,9 +292,9 @@ local function setShown(styleKey, on)
 end
 
 function Echo:Refresh()
-    local want = wantedStyle()
+    local style, want, mode, custom = wantedStyle()
     if want and not containers[want] then
-        if InCombatLockdown() then want = active else build(want) end   -- erst nach dem Kampf aufbauen
+        if InCombatLockdown() then want = active else build(want, style, mode, custom) end   -- erst nach dem Kampf
     end
     if want ~= active then
         if active then setShown(active, false) end
@@ -281,7 +310,7 @@ function Echo:Refresh()
         if math.abs(info.frame:GetScale() - total) > 0.001 then info.frame:SetScale(total) end
         local alpha = ns:Opt("echoFxAlpha") or 1
         if math.abs(info.frame:GetAlpha() - alpha) > 0.001 then info.frame:SetAlpha(alpha) end
-        local st = STYLES[active]
+        local st = STYLES[info.style]
         local y = (st.y + (ns:Opt("echoFxY") or 0)) / scale
         if info.y ~= y then
             info.y = y
@@ -293,9 +322,9 @@ end
 
 -- Zeile für /frot state
 function Echo:StatusText()
-    local style = wantedStyle()
+    local style, key = wantedStyle()
     if not style then return "aus" end
-    local info = containers[style]
+    local info = containers[key]
     if not info then return style .. ": noch nicht aufgebaut" end
     if info.failed then return style .. ": Fehler – " .. info.failed end
     return style .. ": " .. table.concat(info.status, "; ")
