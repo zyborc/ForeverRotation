@@ -6,6 +6,8 @@
 --   * Reaktionszeit: wie lange ein Zauber "jetzt drücken" war, bevor du ihn gedrückt hast
 --   * ungenutzte GCD-Zeit: Zeit, in der etwas bereit war, der GCD frei, aber nichts gedrückt
 --   * ausgelaufene Buffs (z. B. Siegel) im Kampf
+--   * pro Regelgruppe: wie oft angezeigt / befolgt (z. B. Seal Twisting) und ein kurzes
+--     Protokoll "Sekunde Empfehlung|Gruppe" bzw. "Sekunde >Cast" zum Nachvollziehen
 -- Gezählt werden nur Zauber, die in der Rotation vorkommen (Heilung, Reittier usw. nicht).
 
 local _, ns = ...
@@ -17,6 +19,7 @@ ns.Coach = Coach
 local fight            -- laufender Kampf oder nil
 local MAX_DELAY = 10   -- längere "Verzögerungen" sind Pausen, keine Reaktionszeit
 local HISTORY = 10     -- so viele Kämpfe werden gespeichert
+local LOG_MAX = 120    -- Protokolleinträge pro Kampf
 
 local function inRotation(key)
     local def = ns.rotation
@@ -42,8 +45,17 @@ function Coach:Start()
         instead = {},    -- [Schlüssel] = Anzahl Casts gegen die Empfehlung
         drops = {},      -- [Buff-Gruppe] = Anzahl ausgelaufen
         dropSeen = {},
-        cur = nil, curSince = 0, curAvail = nil,
+        groupShown = {}, -- [Regelgruppe] = so oft als "jetzt drücken" angezeigt
+        groupHit = {},   -- [Regelgruppe] = so oft befolgt
+        log = {},
+        cur = nil, curRule = nil, curSince = 0, curAvail = nil,
     }
+end
+
+local function addLog(f, now, text)
+    if #f.log < LOG_MAX then
+        f.log[#f.log + 1] = string.format("%.1f %s", now - f.start, text)
+    end
 end
 
 -- Aus der Anzeige (20x pro Sekunde): aktuelle Empfehlung
@@ -54,6 +66,16 @@ function Coach:OnRecommend(rule, readyNow, s)
     fight.lastTick = now
 
     local key = (rule and readyNow) and rule.spell or nil
+    local shownRule = key and rule or nil
+    if shownRule ~= fight.curRule then
+        -- neue Regel (auch gleicher Zauber aus anderer Gruppe, z. B. Siegel -> Twist)
+        fight.curRule = shownRule
+        if shownRule then
+            local group = shownRule.group
+            if group then fight.groupShown[group] = (fight.groupShown[group] or 0) + 1 end
+            addLog(fight, now, group and (key .. "|" .. group) or key)
+        end
+    end
     if key ~= fight.cur then
         fight.cur = key
         fight.curSince = now
@@ -85,6 +107,7 @@ end
 -- Aus dem Kern: eigener Cast (Schlüssel = englischer Name)
 function Coach:OnCast(key, now)
     if not fight or not inRotation(key) then return end
+    addLog(fight, now, ">" .. key)
     if not fight.cur then
         -- nichts war "jetzt" dran (z. B. früh gedrückt): weder richtig noch falsch
         fight.curSince = now
@@ -93,6 +116,8 @@ function Coach:OnCast(key, now)
     fight.casts = fight.casts + 1
     if fight.cur == key then
         fight.match = fight.match + 1
+        local group = fight.curRule and fight.curRule.group
+        if group then fight.groupHit[group] = (fight.groupHit[group] or 0) + 1 end
         local delay = fight.curAvail and math.max(0, now - fight.curAvail) or 0
         if delay <= MAX_DELAY then
             fight.delaySum = fight.delaySum + delay
@@ -106,6 +131,7 @@ function Coach:OnCast(key, now)
         fight.instead[key] = (fight.instead[key] or 0) + 1
     end
     fight.cur = nil   -- neue Empfehlung abwarten
+    fight.curRule = nil
     fight.curSince = now
     fight.curAvail = nil
 end
@@ -120,6 +146,7 @@ local function summarize(f, duration)
         casts = f.casts, match = f.match, idle = f.idle,
         avgDelay = f.delayN > 0 and f.delaySum / f.delayN or 0,
         drops = f.drops, instead = f.instead, perSpell = f.perSpell,
+        groupShown = f.groupShown, groupHit = f.groupHit, log = f.log,
     }
     -- langsamster Zauber (mindestens 2-mal gedrückt)
     local worst, worstAvg, worstN
@@ -180,6 +207,12 @@ function Coach:Tips(r)
             tips[#tips + 1] = string.format(L["Dein Siegel ist %d× im Kampf ausgelaufen. Erneuere es früher (Option „Siegel erneuern ab Restzeit“)."], n)
         end
     end
+    local twistShown = r.groupShown and r.groupShown.twist or 0
+    local twistHit = r.groupHit and r.groupHit.twist or 0
+    if twistShown > twistHit then
+        tips[#tips + 1] = string.format(L["Seal Twisting %d× angezeigt, %d× gewechselt. Jeder Wechsel löst die gespeicherten Kopien aus."],
+            twistShown, twistHit)
+    end
     if r.slowest and r.slowestAvg and r.slowestAvg >= 0.8 then
         tips[#tips + 1] = string.format(L["%s drückst du im Schnitt %.1f s zu spät. Leg ihn auf eine gut erreichbare Taste."],
             ns:SpellName(r.slowest), r.slowestAvg)
@@ -214,6 +247,10 @@ function Coach:Print(r, title)
     end
     for group, n in pairs(r.drops or {}) do
         extra[#extra + 1] = string.format(L["%s ausgelaufen: %d×"], group == "seal" and L["Siegel"] or group, n)
+    end
+    if r.groupShown and (r.groupShown.twist or 0) > 0 then
+        extra[#extra + 1] = string.format(L["Seal Twisting: %d× angezeigt, %d× gewechselt"],
+            r.groupShown.twist, r.groupHit and r.groupHit.twist or 0)
     end
     local instead = {}
     for key, n in pairs(r.instead or {}) do instead[#instead + 1] = ns:SpellName(key) .. " " .. n .. "×" end
