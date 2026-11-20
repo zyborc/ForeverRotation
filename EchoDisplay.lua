@@ -26,6 +26,12 @@ local STYLES = {
         base = "echo_edge", tintBase = true, fill = "echo_arcs", glow = "echo_glow",
         vertical = true, from = 218, to = 38,
     },
+    halo = {
+        tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
+        base = "echo_halo_base", fill = "echo_halo_fill", glow = "echo_halo_glow",
+        vertical = true, from = 218, to = 38,
+        wings = { file = "echo_wings", w = 320, h = 120, y = 150 },   -- über dem Kopf, bei 3 Kopien
+    },
     runes = {
         tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
         base = "echo_runes_base", fill = "echo_runes_fill", glow = "echo_runes_glow",
@@ -131,6 +137,14 @@ local function initFull(button, e, st, container)
     local fill = texture(bar, "OVERLAY", 1, st.fill, button)
     fill:SetBlendMode("ADD")
     fill:SetVertexColor(e.full[1], e.full[2], e.full[3], 0.9)
+    if st.wings then
+        local wg = bar:CreateTexture(nil, "OVERLAY", nil, 2)
+        wg:SetTexture(TEX .. st.wings.file)
+        wg:SetSize(st.wings.w, st.wings.h)
+        wg:SetPoint("CENTER", button, "CENTER", 0, st.wings.y)
+        wg:SetBlendMode("ADD")
+        wg:SetVertexColor(e.full[1], e.full[2], e.full[3], 1)
+    end
     button:SetApplicationBar(bar, { minApplications = 3, maxApplications = 3 })
 end
 
