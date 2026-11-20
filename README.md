@@ -52,6 +52,9 @@ Buffs, DoTs pro Ziel, Combo-Punkte, Totems. Außerhalb des Kampfs gleicht es all
 Im Kampf hilft zusätzlich Blizzards **Cooldown-Manager** (Edit Mode): Verfolgt er eine Aura (z. B. dein
 Siegel), erkennt das Addon, ob – und beim Siegel welches – gerade aktiv ist. Außerdem prüft es, ob ein
 Cooldown vorzeitig frei geworden ist (nur ja/nein, die Restzeit bleibt geheim).
+Für Vergeltungs-Paladine zeigt die **Echo-Anzeige** die gespeicherten Kopien von Unsealed Wrath am
+Charakter (goldener Echo-Bogen, schlichte Bögen oder Klinge des Lichts). Gezeichnet wird sie von Blizzards
+eigener Aura-Anzeige – die Stapel stimmen also 1:1, auch im Kampf, obwohl sie für Addons geheim sind.
 
 Folgen davon:
 - Procs (Hot Streak, Fingers of Frost, …) und Combo-Punkte aus kritischen Treffern sieht das Addon nicht.
@@ -84,6 +87,8 @@ all commands, `/frot role tank|dps|heal|auto` sets your role.
 The addon tracks cooldowns, buffs, DoTs, combo points and totems from your own casts instead, and syncs
 them with the real values out of combat. In combat, Blizzard's Cooldown Manager (Edit Mode) also tells the
 addon whether a tracked aura (e.g. your seal) is active, and whether a cooldown is ready early (yes/no only).
+For Retribution, the Echo display shows your Unsealed Wrath copies around your character, drawn 1:1 by
+Blizzard's own aura display (works in combat).
 Procs are mostly invisible to addons; healer rotations only cover buffs and cooldowns.
 
 License: [MIT](LICENSE)

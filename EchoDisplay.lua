@@ -4,7 +4,7 @@
 -- zeichnet sie aber selbst: Pro Kopie-Aura (Echo of Command, Echo of Righteousness …) gibt es
 -- einen Slot; das Spiel setzt den Wert einer Stapelleiste auf die echte Stapelzahl und blendet
 -- eine zweite Leiste nur ab 3 Stapeln ein. An der ersten hängt ein Ausschnitt, der die Füllung
--- (Bögen, Hohlkehle des Schwerts, Edelsteine) freigibt, an der zweiten das Leuchten. Das Addon
+-- (Bögen, Runen-Kanal der Klinge) freigibt, an der zweiten das Leuchten. Das Addon
 -- liest dabei NICHTS – die Anzeige stimmt 1:1, die Werte bleiben geheim.
 -- (Aufbau nach Blizzard_CustomAuraContainer.)
 
@@ -24,6 +24,23 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 -- Stufen-Stile (stages): je Stufe ein Slot, den das Spiel erst ab `min` Stapeln zeigt. Teile:
 --   file, color ("seal" = Siegelfarbe, "target" = Zielfarbe, nil = Originalfarben), alpha, add (ADD-Mischung)
 local STYLES = {
+    arch = {     -- Echo-Bogen: linker Bogen / Hammer mit Flügeln / rechter Bogen
+        w = 400, h = 200, x = 0, y = 90,
+        stages = {
+            { min = 1, parts = {
+                { file = "echo_arch_p1", alpha = 0.25 }, { file = "echo_arch_p2", alpha = 0.25 },
+                { file = "echo_arch_p3", alpha = 0.25 },
+                { file = "echo_arch_g1", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_p1" } } },
+            { min = 2, parts = {
+                { file = "echo_arch_g2", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_p2" } } },
+            { min = 3, parts = {
+                { file = "echo_arch_g3", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_p3" },
+                { file = "echo_arch_glow", color = "target", alpha = 0.35, add = true } } },
+        },
+    },
     custom = {   -- eigene Grafik aus ForeverRotation/Custom/ (tools/echo_custom.py), nicht im Repo
         dir = CUSTOM, w = 400, h = 200, x = 0, y = 90,
         stages = {
@@ -46,26 +63,10 @@ local STYLES = {
         base = "echo_edge", tintBase = true, fill = "echo_arcs", glow = "echo_glow",
         vertical = true, from = 218, to = 38,
     },
-    halo = {
-        tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
-        base = "echo_halo_base", fill = "echo_halo_fill", glow = "echo_halo_glow",
-        vertical = true, from = 218, to = 38,
-        wings = { file = "echo_wings", w = 320, h = 120, y = 150 },   -- über dem Kopf, bei 3 Kopien
-    },
-    runes = {
-        tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
-        base = "echo_runes_base", fill = "echo_runes_fill", glow = "echo_runes_glow",
-        vertical = true, from = 218, to = 38,
-    },
     blade = {
         tw = 256, th = 512, w = 120, h = 240, x = 160, y = 0,
         base = "echo_blade_base", fill = "echo_blade_fill", glow = "echo_blade_glow",
         vertical = true, from = 330, to = 70,
-    },
-    gems = {
-        tw = 256, th = 64, w = 192, h = 48, x = 0, y = -125,
-        base = "echo_gems_base", fill = "echo_gems_fill", glow = "echo_gems_glow",
-        vertical = false, from = 20, to = 236,
     },
 }
 
@@ -245,7 +246,8 @@ local function wantedStyle()
     if not (ns.rotation and ns.rotation.id == "PALADIN_RETRIBUTION") then return nil end
     local style = ns:Opt("echoFx")
     if style == true then style = "arcs" end      -- alte Einstellung (an/aus)
-    if style == "sword" then style = "blade" end  -- alter Stil
+    if style == "sword" then style = "blade" end  -- alte Stile
+    if style == "halo" or style == "runes" or style == "gems" then style = "arch" end
     return STYLES[style] and style or nil
 end
 
