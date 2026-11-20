@@ -352,8 +352,10 @@ ns:RegisterRotation({
                      desc = "Wechselt im Kampf zwischen {Seal of Command} und {Seal of Righteousness}, damit {Unsealed Wrath} die gespeicherten Siegel-Kopien auslöst.\nmit {Unsealed Wrath} = nur, wenn das Talent geskillt ist." },
         twistSwings = { order = 6, default = 3, min = 1, max = 3, step = 1, label = "Twisten nach Schlägen",
                         desc = "{Unsealed Wrath} speichert bis zu 3 Kopien. Die Schläge werden über deine Waffengeschwindigkeit geschätzt (außerhalb des Kampfs gemessen)." },
-        echoFx   = { order = 7, default = true, label = "Echo-Anzeige am Charakter",
-                     desc = "Bögen links und rechts von deinem Charakter zeigen die gespeicherten Kopien von {Unsealed Wrath} – gezeichnet vom Spiel selbst, also genau wie im Spiel (auch im Kampf). Farbe = Siegel der Kopien, bei 3 Kopien leuchten sie in der Farbe des Siegels, auf das du wechseln solltest." },
+        echoFx   = { order = 7, default = "arcs", label = "Echo-Anzeige am Charakter",
+                     values = { "arcs", "sword", "gems", "off" },
+                     valueLabels = { arcs = "Bögen", sword = "Schwert", gems = "Edelsteine", off = "aus" },
+                     desc = "Zeigt die gespeicherten Kopien von {Unsealed Wrath} – gezeichnet vom Spiel selbst, also genau wie im Spiel (auch im Kampf). Farbe = Siegel der Kopien, bei 3 Kopien leuchtet alles in der Farbe des Siegels, auf das du wechseln solltest.\nBögen = links und rechts vom Charakter, Schwert = Klinge rechts vom Charakter füllt sich, Edelsteine = drei Steine unter dem Charakter." },
         echoFxScale = { order = 8, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe der Echo-Anzeige" },
     }),
 

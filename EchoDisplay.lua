@@ -3,9 +3,10 @@
 -- Die Stapel der Siegel-Kopien sind im Kampf für Addons geheim. Blizzards AuraContainer
 -- zeichnet sie aber selbst: Pro Kopie-Aura (Echo of Command, Echo of Righteousness …) gibt es
 -- einen Slot; das Spiel setzt den Wert einer Stapelleiste auf die echte Stapelzahl und blendet
--- eine zweite Leiste nur ab 3 Stapeln ein. An der ersten hängt ein Ausschnitt, der die Bögen von
--- unten nach oben freigibt, an der zweiten das Leuchten. Das Addon liest dabei NICHTS – die
--- Anzeige stimmt 1:1, die Werte bleiben geheim. (Aufbau nach Blizzard_CustomAuraContainer.)
+-- eine zweite Leiste nur ab 3 Stapeln ein. An der ersten hängt ein Ausschnitt, der die Füllung
+-- (Bögen, Hohlkehle des Schwerts, Edelsteine) freigibt, an der zweiten das Leuchten. Das Addon
+-- liest dabei NICHTS – die Anzeige stimmt 1:1, die Werte bleiben geheim.
+-- (Aufbau nach Blizzard_CustomAuraContainer.)
 
 local _, ns = ...
 
@@ -14,10 +15,30 @@ ns.EchoDisplay = Echo
 
 local TEX = "Interface\\AddOns\\ForeverRotation\\Textures\\"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
-local W, H = 512, 256
-local BAR_TOP, BAR_BOTTOM = 38, 218      -- senkrechter Bereich der Bögen in der Textur
 
--- Kopie-Auren von Unsealed Wrath je Siegel: Farbe der Bögen, Farbe des Leuchtens bei 3
+-- Stile: Texturgröße (tw, th), Anzeigegröße (w, h), Lage zum Charakter, Füllbereich in Textur-Pixeln.
+--   base     Grundbild ab der 1. Kopie (tintBase = in Siegelfarbe einfärben)
+--   fill     wird von unten nach oben (bzw. links nach rechts) freigegeben
+--   glow     Schein bei 3 Kopien
+local STYLES = {
+    arcs = {
+        tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
+        base = "echo_edge", tintBase = true, fill = "echo_arcs", glow = "echo_glow",
+        vertical = true, from = 218, to = 38,
+    },
+    sword = {
+        tw = 128, th = 512, w = 80, h = 320, x = 150, y = 0,
+        base = "echo_sword_base", fill = "echo_sword_fill", glow = "echo_sword_glow",
+        vertical = true, from = 350, to = 70,
+    },
+    gems = {
+        tw = 256, th = 64, w = 192, h = 48, x = 0, y = -125,
+        base = "echo_gems_base", fill = "echo_gems_fill", glow = "echo_gems_glow",
+        vertical = false, from = 20, to = 236,
+    },
+}
+
+-- Kopie-Auren von Unsealed Wrath je Siegel: Farbe der Füllung, Farbe des Leuchtens bei 3
 -- (beim Twisten = Farbe des Siegels, auf das gewechselt wird)
 local ORANGE, BLUE, GOLD = { 1.00, 0.55, 0.10 }, { 0.35, 0.75, 1.00 }, { 1.00, 0.85, 0.30 }
 local ECHOES = {
@@ -29,144 +50,169 @@ local ECHOES = {
     { id = 1328206, color = { 0.30, 0.90, 0.90 },    full = GOLD },   -- Echo of Wisdom
 }
 
-local container
-local built, failed = false, nil
-local status = {}          -- für /frot state: Slots, die angelegt wurden / Fehler
+local containers = {}   -- [Stil] = { frame = AuraContainer, status = "...", failed = "..." }
+local active             -- Stil, der gerade läuft
 
 local function interp()
     return Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
 end
 
--- Slot "Stapel": Umriss + Bögen, die das Spiel über die Stapelleiste freigibt
-local function initStacks(button, e)
+local function texture(parent, layer, sub, file, button)
+    local t = parent:CreateTexture(nil, layer, nil, sub)
+    t:SetTexture(TEX .. file)
+    t:SetAllPoints(button)
+    return t
+end
+
+-- Slot "Stapel": Grundbild + Füllung, die das Spiel über die Stapelleiste freigibt
+local function initStacks(button, e, st, container)
     button:EnableMouse(false)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
-    button:SetSize(W, H)
+    button:SetSize(st.w, st.h)
     local r, g, b = e.color[1], e.color[2], e.color[3]
+    local fx, fy = st.w / st.tw, st.h / st.th
 
-    local edge = button:CreateTexture(nil, "BACKGROUND")
-    edge:SetTexture(TEX .. "echo_edge")
-    edge:SetAllPoints(button)
-    edge:SetVertexColor(r, g, b, 0.8)
+    local base = texture(button, "BACKGROUND", 0, st.base, button)
+    if st.tintBase then base:SetVertexColor(r, g, b, 0.8) end
 
-    -- unsichtbare Leiste: das Spiel setzt ihren Wert auf die Stapelzahl (0..3)
+    -- unsichtbare Leiste über dem Füllbereich: das Spiel setzt ihren Wert auf die Stapelzahl
     local bar = CreateFrame("StatusBar", nil, button)
-    bar:SetOrientation("VERTICAL")
     bar:SetStatusBarTexture(WHITE)
     bar:SetStatusBarColor(0, 0, 0, 0)
-    bar:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -BAR_TOP)
-    bar:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, H - BAR_BOTTOM)
     bar:SetMinMaxValues(0, 3)
     bar:SetValue(0)
-
-    -- Ausschnitt von unten bis zur Füllkante der Leiste
     local clip = CreateFrame("Frame", nil, button)
     clip:SetClipsChildren(true)
-    clip:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT")
-    clip:SetPoint("RIGHT", button, "RIGHT")
-    clip:SetPoint("TOP", bar:GetStatusBarTexture(), "TOP")
-    local arcs = clip:CreateTexture(nil, "ARTWORK")
-    arcs:SetTexture(TEX .. "echo_arcs")
-    arcs:SetPoint("TOPLEFT", button, "TOPLEFT")
-    arcs:SetSize(W, H)
-    arcs:SetBlendMode("ADD")
-    arcs:SetVertexColor(r, g, b, 1)
+    if st.vertical then
+        bar:SetOrientation("VERTICAL")
+        bar:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -st.to * fy)
+        bar:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, (st.th - st.from) * fy)
+        clip:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT")
+        clip:SetPoint("RIGHT", button, "RIGHT")
+        clip:SetPoint("TOP", bar:GetStatusBarTexture(), "TOP")
+    else
+        bar:SetOrientation("HORIZONTAL")
+        bar:SetPoint("TOPLEFT", button, "TOPLEFT", st.from * fx, 0)
+        bar:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -(st.tw - st.to) * fx, 0)
+        clip:SetPoint("TOPLEFT", button, "TOPLEFT")
+        clip:SetPoint("BOTTOM", button, "BOTTOM")
+        clip:SetPoint("RIGHT", bar:GetStatusBarTexture(), "RIGHT")
+    end
+    local fill = clip:CreateTexture(nil, "ARTWORK")
+    fill:SetTexture(TEX .. st.fill)
+    fill:SetPoint("TOPLEFT", button, "TOPLEFT")
+    fill:SetSize(st.w, st.h)
+    fill:SetBlendMode("ADD")
+    fill:SetVertexColor(r, g, b, 1)
 
     -- erst jetzt übergeben: danach gehört der Wert der Leiste dem Spiel (geheim)
     button:SetApplicationBar(bar, { maxApplications = 3, interpolation = interp() })
 end
 
--- Slot "voll": Leuchten, das das Spiel nur ab 3 Stapeln einblendet
-local function initFull(button, e)
+-- Slot "voll": Leuchten und volle Füllung in Zielfarbe, nur ab 3 Stapeln (entscheidet das Spiel)
+local function initFull(button, e, st, container)
     button:EnableMouse(false)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
-    button:SetSize(W, H)
+    button:SetSize(st.w, st.h)
     local bar = CreateFrame("StatusBar", nil, button)
     bar:SetAllPoints(button)
     bar:SetStatusBarTexture(WHITE)
     bar:SetStatusBarColor(0, 0, 0, 0)
-    local glow = bar:CreateTexture(nil, "OVERLAY")
-    glow:SetTexture(TEX .. "echo_glow")
-    glow:SetAllPoints(button)
+    local glow = texture(bar, "BACKGROUND", -1, st.glow, button)
     glow:SetBlendMode("ADD")
     glow:SetVertexColor(e.full[1], e.full[2], e.full[3], 0.9)
-    local arcs = bar:CreateTexture(nil, "OVERLAY", nil, 1)
-    arcs:SetTexture(TEX .. "echo_arcs")
-    arcs:SetAllPoints(button)
-    arcs:SetBlendMode("ADD")
-    arcs:SetVertexColor(e.full[1], e.full[2], e.full[3], 0.9)
-    -- das Spiel zeigt die Leiste (und damit das Leuchten) nur bei Stapel >= 3
+    local fill = texture(bar, "OVERLAY", 1, st.fill, button)
+    fill:SetBlendMode("ADD")
+    fill:SetVertexColor(e.full[1], e.full[2], e.full[3], 0.9)
     button:SetApplicationBar(bar, { minApplications = 3, maxApplications = 3 })
 end
 
-local function addSlot(key, spellID, init, e)
-    local initErr
-    local ok, err = pcall(container.AddAuraSlot, container, key, "HELPFUL", {
-        candidateFilters = { includeSpellIDs = { [spellID] = true } },
-        initializeFrame = function(button)
-            local okI, errI = pcall(init, button, e)
-            if not okI then initErr = errI end
-        end,
-    })
-    if not ok or initErr then
-        status[#status + 1] = key .. ": " .. tostring(initErr or err):sub(1, 120)
-        return false
-    end
-    pcall(container.SetAuraSlotEnabled, container, key, true)
-    return true
-end
-
-local function build()
-    built = true
+local function build(styleKey)
+    local st = STYLES[styleKey]
+    local info = { status = {} }
+    containers[styleKey] = info
     local ok, c = pcall(CreateFrame, "AuraContainer", nil, UIParent, "CustomAuraContainerTemplate")
     if not ok or not c then
-        failed = "AuraContainer: " .. tostring(c)
+        info.failed = "AuraContainer: " .. tostring(c)
         return
     end
-    container = c
-    container:SetSize(W, H)
-    container:SetPoint("CENTER", UIParent, "CENTER", 0, -10)
-    container:SetFrameStrata("BACKGROUND")
-    container:EnableMouse(false)
-    local okU, errU = pcall(container.SetUnit, container, "player")
-    if not okU then failed = "SetUnit: " .. tostring(errU) return end
+    info.frame = c
+    c:SetSize(st.w, st.h)
+    c:SetPoint("CENTER", UIParent, "CENTER", st.x, st.y)
+    c:SetFrameStrata("BACKGROUND")
+    c:EnableMouse(false)
+    c:Hide()
+    local okU, errU = pcall(c.SetUnit, c, "player")
+    if not okU then info.failed = "SetUnit: " .. tostring(errU) return end
+    pcall(c.SetEnabled, c, false)
+
     local n = 0
-    for _, e in ipairs(ECHOES) do
-        if addSlot("s" .. e.id, e.id, initStacks, e) then n = n + 1 end
-        if addSlot("f" .. e.id, e.id, initFull, e) then n = n + 1 end
+    local function addSlot(key, spellID, init, e)
+        local initErr
+        local okA, err = pcall(c.AddAuraSlot, c, key, "HELPFUL", {
+            candidateFilters = { includeSpellIDs = { [spellID] = true } },
+            initializeFrame = function(button)
+                local okI, errI = pcall(init, button, e, st, c)
+                if not okI then initErr = errI end
+            end,
+        })
+        if not okA or initErr then
+            info.status[#info.status + 1] = key .. ": " .. tostring(initErr or err):sub(1, 120)
+            return
+        end
+        pcall(c.SetAuraSlotEnabled, c, key, true)
+        n = n + 1
     end
-    status[#status + 1] = n .. " Slots angelegt"
+    for _, e in ipairs(ECHOES) do
+        addSlot("s" .. e.id, e.id, initStacks, e)
+        addSlot("f" .. e.id, e.id, initFull, e)
+    end
+    table.insert(info.status, 1, n .. " Slots angelegt")
 end
 
--- Soll die Anzeige laufen? Nur Vergeltung mit Option an.
-local function wanted()
-    return ns.rotation and ns.rotation.id == "PALADIN_RETRIBUTION" and ns:Opt("echoFx") and true or false
+-- Gewünschter Stil oder nil (nur Vergeltung mit Option an)
+local function wantedStyle()
+    if not (ns.rotation and ns.rotation.id == "PALADIN_RETRIBUTION") then return nil end
+    local style = ns:Opt("echoFx")
+    if style == true then style = "arcs" end      -- alte Einstellung (an/aus)
+    return STYLES[style] and style or nil
+end
+
+local function setShown(styleKey, on)
+    local info = containers[styleKey]
+    if info and info.frame then
+        pcall(info.frame.SetEnabled, info.frame, on)
+        info.frame:SetShown(on)
+    end
 end
 
 function Echo:Refresh()
-    local want = wanted()
-    if want and not built then
-        if InCombatLockdown() then return end   -- erst nach dem Kampf aufbauen
-        build()
+    local want = wantedStyle()
+    if want and not containers[want] then
+        if InCombatLockdown() then want = active else build(want) end   -- erst nach dem Kampf aufbauen
     end
-    if container and want ~= self.shown then
-        self.shown = want
-        pcall(container.SetEnabled, container, want)
-        container:SetShown(want)
+    if want ~= active then
+        if active then setShown(active, false) end
+        active = want
+        if active then setShown(active, true) end
     end
-    if container and want then
+    local info = active and containers[active]
+    if info and info.frame then
         local scale = ns:Opt("echoFxScale") or 1
-        if container:GetScale() ~= scale then container:SetScale(scale) end
+        if info.frame:GetScale() ~= scale then info.frame:SetScale(scale) end
     end
 end
 
 -- Zeile für /frot state
 function Echo:StatusText()
-    if failed then return "Fehler – " .. failed end
-    if not built then return "nicht aufgebaut" end
-    return table.concat(status, "; ")
+    local style = wantedStyle()
+    if not style then return "aus" end
+    local info = containers[style]
+    if not info then return style .. ": noch nicht aufgebaut" end
+    if info.failed then return style .. ": Fehler – " .. info.failed end
+    return style .. ": " .. table.concat(info.status, "; ")
 end
 
 local ev = CreateFrame("Frame")
