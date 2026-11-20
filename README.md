@@ -54,8 +54,8 @@ Siegel), erkennt das Addon, ob – und beim Siegel welches – gerade aktiv ist.
 Cooldown vorzeitig frei geworden ist (nur ja/nein, die Restzeit bleibt geheim). Beim Seal Twisting
 zählt es die gespeicherten Kopien von Unsealed Wrath über dessen Buff-Symbol im Cooldown-Manager
 (1 Kopie genau, ab 2 „mindestens 2“) statt nur über die Waffengeschwindigkeit zu schätzen.
-Optional zeigt ein Effekt am Charakter die Kopien als Rauten in der Farbe ihres Siegels und lässt
-Bögen links und rechts in der Farbe des Zielsiegels aufleuchten, sobald der Wechsel fällig ist.
+Optional füllen sich Bögen links und rechts vom Charakter mit jeder Kopie (in der Farbe ihres Siegels)
+und pulsieren in der Farbe des Zielsiegels, sobald der Wechsel fällig ist – ähnlich Maelstrom Weapon.
 
 Folgen davon:
 - Procs (Hot Streak, Fingers of Frost, …) und Combo-Punkte aus kritischen Treffern sieht das Addon nicht.
@@ -89,7 +89,7 @@ The addon tracks cooldowns, buffs, DoTs, combo points and totems from your own c
 them with the real values out of combat. In combat, Blizzard's Cooldown Manager (Edit Mode) also tells the
 addon whether a tracked aura (e.g. your seal) is active, and whether a cooldown is ready early (yes/no only).
 Seal twisting counts the stored Unsealed Wrath copies from its Cooldown Manager buff icon, with an
-optional effect around your character (colored diamonds, glowing arcs when it's time to switch).
+optional effect around your character (arcs filling per copy, pulsing when it's time to switch).
 Procs are mostly invisible to addons; healer rotations only cover buffs and cooldowns.
 
 License: [MIT](LICENSE)

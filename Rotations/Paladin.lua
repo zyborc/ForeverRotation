@@ -419,7 +419,7 @@ ns:RegisterRotation({
         twistCDM = { order = 7, default = true, label = "Kopien aus dem Cooldown-Manager",
                      desc = "Liest die gespeicherten Kopien von {Unsealed Wrath} aus dem Blizzard-Cooldown-Manager (Buff-Symbole, Bearbeitungsmodus). 1 Kopie ist genau erkennbar, ab 2 nur „mindestens 2“ – die dritte wird dann über die Zeit geschätzt. Ist {Unsealed Wrath} dort nicht eingetragen, wird nur geschätzt." },
         twistFx  = { order = 8, default = true, label = "Twist-Effekt am Charakter",
-                     desc = "Zeigt die gespeicherten Kopien als Rauten unter deinem Charakter – orange für {Seal of Command}, blau für {Seal of Righteousness}. Ist der Wechsel fällig, leuchten Bögen links und rechts in der Farbe des Zielsiegels und sein Symbol erscheint. Blasse Rauten = nur geschätzt, flackernde Raute = vielleicht schon da. Bei offenen Einstellungen läuft eine Vorführung." },
+                     desc = "Bögen links und rechts von deinem Charakter füllen sich mit jeder gespeicherten Kopie von unten nach oben – orange für {Seal of Command}, blau für {Seal of Righteousness}. Ist der Wechsel fällig, pulsieren sie in der Farbe des Zielsiegels. Blasse Bögen = nur geschätzt, flackerndes Segment = vielleicht schon da. Bei offenen Einstellungen läuft eine Vorführung." },
         twistFxScale = { order = 9, default = 1, min = 0.6, max = 1.6, step = 0.1, label = "Größe des Twist-Effekts" },
     }),
 

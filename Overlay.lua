@@ -1,209 +1,174 @@
--- ForeverRotation – Effekt am Charakter (wie Blizzards Proc-Bögen, z. B. Maelstrom Weapon).
--- Eine Rotation kann `overlay = function(s, demo)` liefern; Rückgabe (oder nil = aus):
---   count, max      gesammelte Stapel / Höchstzahl (Rauten unter dem Charakter)
---   atLeast         Zahl ist nur "mindestens count" (nächste Raute flackert)
---   estimated       Stapel nur geschätzt (Rauten etwas blasser)
---   r, g, b         Farbe der gesammelten Stapel
---   ready           jetzt handeln: Bögen und Symbol leuchten in der Zielfarbe
---   spell, tr, tg, tb   Zielzauber (Symbol in der Mitte) und seine Farbe
+-- ForeverRotation – Effekt am Charakter ("Sturmbögen", ähnlich Maelstrom Weapon).
+-- Links und rechts vom Charakter je ein Bogen aus Segmenten, die sich von unten nach oben
+-- füllen – ein Segment pro Stapel, in der Farbe der Stapel. Ist es Zeit zu handeln, leuchten
+-- alle Segmente in der Zielfarbe und pulsieren.
+--
+-- Eine Rotation liefert `overlay = function(s, demo)`; Rückgabe (oder nil = aus):
+--   count, max      gesammelte Stapel / Segmente (max. 3)
+--   atLeast         Zahl ist nur "mindestens count" (nächstes Segment flackert)
+--   estimated       Stapel nur geschätzt (Segmente blasser)
+--   r, g, b         Farbe der Stapel
+--   ready, tr, tg, tb   jetzt handeln, in dieser Farbe
 --   scale           Größe (Option)
--- Reine Anzeige, nichts Anklickbares, keine geschützten Funktionen.
+-- Reine Anzeige: nichts Anklickbares, keine geschützten Funktionen.
 
 local _, ns = ...
 
 local Overlay = {}
 ns.Overlay = Overlay
 
-local WHITE = "Interface\\Buttons\\WHITE8X8"
--- Blizzards Proc-Bögen; falls der Client sie nicht hat, zeichnen wir eigene Leuchtsäulen.
-local SAO_TEXTURES = {
-    "Textures\\SpellActivationOverlays\\Art_of_War",
-    "Textures\\SpellActivationOverlays\\Daybreak",
-    "Textures\\SpellActivationOverlays\\Maelstrom_Weapon",
-    "Textures\\SpellActivationOverlays\\Generic_Arc_01",
-}
-local MAX_PIPS = 5
+local TEX = "Interface\\AddOns\\ForeverRotation\\Textures\\"
+local SEGMENTS = 3
+local TEX_W, TEX_H = 128, 256
+local CENTER_X, CENTER_Y = 200, 128   -- Kreismittelpunkt im Texturraum (= Charakter)
 
 local frame
 
-local function setSAO(tex)
-    for _, path in ipairs(SAO_TEXTURES) do
-        local ok, res = pcall(tex.SetTexture, tex, path)
-        if ok and res == true then return path end
-    end
-    return nil
-end
-
-local function pulse(target, from, to, dur)
-    local ag = target:CreateAnimationGroup()
-    ag:SetLooping("BOUNCE")
+local function anim(region, from, to, dur, loop)
+    local ag = region:CreateAnimationGroup()
+    if loop then ag:SetLooping("BOUNCE") end
     local a = ag:CreateAnimation("Alpha")
     a:SetFromAlpha(from); a:SetToAlpha(to); a:SetDuration(dur); a:SetSmoothing("IN_OUT")
     return ag
 end
 
+-- Textur so setzen, dass der Kreismittelpunkt auf der Charaktermitte liegt
+local function placeSide(tex, f, mirrored)
+    tex:SetSize(TEX_W, TEX_H)
+    if mirrored then
+        tex:SetTexCoord(1, 0, 0, 1)
+        tex:SetPoint("TOPLEFT", f, "CENTER", CENTER_X - TEX_W, CENTER_Y)
+    else
+        tex:SetPoint("TOPLEFT", f, "CENTER", -CENTER_X, CENTER_Y)
+    end
+end
+
 local function build()
     local f = CreateFrame("Frame", nil, UIParent)
     f:SetSize(1, 1)
-    f:SetPoint("CENTER", UIParent, "CENTER", 0, -20)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, -10)
     f:SetFrameStrata("BACKGROUND")
     f:EnableMouse(false)
     f:Hide()
 
-    -- Bögen links/rechts vom Charakter
-    f.arcs = CreateFrame("Frame", nil, f)
-    f.arcs:SetAllPoints(f)
-    local left = f.arcs:CreateTexture(nil, "ARTWORK")
-    local right = f.arcs:CreateTexture(nil, "ARTWORK")
-    local path = setSAO(left)
-    if path then
-        right:SetTexture(path)
-        left:SetSize(128, 256); right:SetSize(128, 256)
-        left:SetPoint("RIGHT", f, "CENTER", -95, 0)
-        right:SetPoint("LEFT", f, "CENTER", 95, 0)
-        right:SetTexCoord(1, 0, 0, 1)               -- gespiegelt
-        left:SetBlendMode("ADD"); right:SetBlendMode("ADD")
-    else
-        -- Ersatz: weiche Leuchtsäulen, nach außen auslaufend
-        for _, t in ipairs({ left, right }) do
-            t:SetTexture(WHITE)
-            t:SetSize(26, 230)
-            t:SetBlendMode("ADD")
+    -- Ebenen: Schienen (immer schwach sichtbar) < Schein (pulsiert) < Segmente
+    f.glowLayer = CreateFrame("Frame", nil, f)
+    f.glowLayer:SetAllPoints(f)
+    f.glowPulse = anim(f.glowLayer, 0.45, 1, 0.35, true)
+    f.coreLayer = CreateFrame("Frame", nil, f)
+    f.coreLayer:SetAllPoints(f)
+    f.corePulse = anim(f.coreLayer, 0.75, 1, 0.35, true)
+
+    f.segs = {}
+    for i = 1, SEGMENTS do
+        local seg = { track = {}, glow = {}, core = {} }
+        for side = 1, 2 do
+            local mirrored = side == 2
+            local track = f:CreateTexture(nil, "BACKGROUND")
+            track:SetTexture(TEX .. "twist_seg" .. i)
+            placeSide(track, f, mirrored)
+            track:SetVertexColor(1, 1, 1, 0.07)
+            seg.track[side] = track
+
+            local glow = f.glowLayer:CreateTexture(nil, "ARTWORK")
+            glow:SetTexture(TEX .. "twist_glow" .. i)
+            glow:SetBlendMode("ADD")
+            placeSide(glow, f, mirrored)
+            seg.glow[side] = glow
+
+            local core = f.coreLayer:CreateTexture(nil, "OVERLAY")
+            core:SetTexture(TEX .. "twist_seg" .. i)
+            core:SetBlendMode("ADD")
+            placeSide(core, f, mirrored)
+            seg.core[side] = core
         end
-        left:SetPoint("RIGHT", f, "CENTER", -110, 0)
-        right:SetPoint("LEFT", f, "CENTER", 110, 0)
-        if CreateColor then
-            left:SetGradient("HORIZONTAL", CreateColor(1, 1, 1, 0), CreateColor(1, 1, 1, 1))
-            right:SetGradient("HORIZONTAL", CreateColor(1, 1, 1, 1), CreateColor(1, 1, 1, 0))
+        -- Aufblitzen, wenn das Segment neu dazukommt
+        seg.flashHolder = CreateFrame("Frame", nil, f.coreLayer)
+        seg.flashHolder:SetAllPoints(f)
+        seg.flash = {}
+        for side = 1, 2 do
+            local fl = seg.flashHolder:CreateTexture(nil, "OVERLAY", nil, 7)
+            fl:SetTexture(TEX .. "twist_glow" .. i)
+            fl:SetBlendMode("ADD")
+            placeSide(fl, f, side == 2)
+            seg.flash[side] = fl
         end
+        seg.flashHolder:SetAlpha(0)
+        local ag = seg.flashHolder:CreateAnimationGroup()
+        local up = ag:CreateAnimation("Alpha"); up:SetFromAlpha(0); up:SetToAlpha(1); up:SetDuration(0.08); up:SetOrder(1)
+        local down = ag:CreateAnimation("Alpha"); down:SetFromAlpha(1); down:SetToAlpha(0); down:SetDuration(0.45); down:SetOrder(2)
+        seg.flashAnim = ag
+        seg.flicker = anim(seg.flashHolder, 0, 0.5, 0.3, true)
+        f.segs[i] = seg
     end
-    f.left, f.right, f.saoPath = left, right, path
-    f.arcPulse = pulse(f.arcs, 0.55, 1, 0.35)
-
-    -- Rauten unter dem Charakter: eine pro Stapel
-    f.pips = {}
-    for i = 1, MAX_PIPS do
-        local p = CreateFrame("Frame", nil, f)
-        p:SetSize(22, 22)
-        p.bg = p:CreateTexture(nil, "BACKGROUND")
-        p.bg:SetTexture(WHITE); p.bg:SetSize(17, 17); p.bg:SetPoint("CENTER")
-        p.bg:SetRotation(math.pi / 4)
-        p.bg:SetVertexColor(0, 0, 0, 0.75)
-        p.glow = p:CreateTexture(nil, "BORDER")
-        p.glow:SetTexture(WHITE); p.glow:SetSize(21, 21); p.glow:SetPoint("CENTER")
-        p.glow:SetRotation(math.pi / 4)
-        p.glow:SetBlendMode("ADD")
-        p.fill = p:CreateTexture(nil, "ARTWORK")
-        p.fill:SetTexture(WHITE); p.fill:SetSize(12, 12); p.fill:SetPoint("CENTER")
-        p.fill:SetRotation(math.pi / 4)
-        p.shine = p:CreateTexture(nil, "OVERLAY")
-        p.shine:SetTexture(WHITE); p.shine:SetSize(4, 4); p.shine:SetPoint("CENTER", -2, 2)
-        p.shine:SetRotation(math.pi / 4)
-        p.shine:SetVertexColor(1, 1, 1, 0.8)
-        p.flicker = pulse(p, 0.25, 1, 0.3)
-        f.pips[i] = p
-    end
-
-    -- Zielzauber in der Mitte, über dem Kopf
-    f.icon = CreateFrame("Frame", nil, f)
-    f.icon:SetSize(44, 44)
-    f.icon:SetPoint("BOTTOM", f, "CENTER", 0, 105)
-    f.icon.ring = f.icon:CreateTexture(nil, "BACKGROUND")
-    f.icon.ring:SetTexture(WHITE); f.icon.ring:SetPoint("TOPLEFT", -4, 4); f.icon.ring:SetPoint("BOTTOMRIGHT", 4, -4)
-    f.icon.ring:SetBlendMode("ADD")
-    f.icon.tex = f.icon:CreateTexture(nil, "ARTWORK")
-    f.icon.tex:SetAllPoints()
-    f.icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    f.icon.pulse = pulse(f.icon, 0.5, 1, 0.3)
-    f.icon:Hide()
-
+    f.lastCount = 0
     frame = f
 end
 
 local function hide()
     if frame and frame:IsShown() then
-        frame.arcPulse:Stop()
-        frame.icon.pulse:Stop()
-        for _, p in ipairs(frame.pips) do p.flicker:Stop() end
+        frame.glowPulse:Stop(); frame.corePulse:Stop()
+        for _, seg in ipairs(frame.segs) do seg.flicker:Stop(); seg.flashAnim:Stop(); seg.flashHolder:SetAlpha(0) end
+        frame.lastCount = 0
         frame:Hide()
     end
 end
 
 function Overlay:Hide() hide() end
 
--- Name der genutzten Bogen-Grafik (für /frot state), nil = eigene Leuchtsäulen
-function Overlay:Style()
-    return frame and (frame.saoPath or "eigene") or nil
+local function setSide(list, r, g, b, a)
+    for side = 1, 2 do
+        list[side]:SetVertexColor(r, g, b, a)
+        list[side]:SetShown(a > 0)
+    end
 end
 
--- Aus der Anzeige (20x pro Sekunde). preview = Einstellungen offen: Vorführung zeigen.
-function Overlay:Update(s, preview)
+-- Aus der Anzeige (20x pro Sekunde). demo = Einstellungen offen: Vorführung zeigen.
+function Overlay:Update(s, demo)
     local def = ns.rotation
-    local d = s and def and def.overlay and def.overlay(s, preview)
+    local d = s and def and def.overlay and def.overlay(s, demo)
     if not d then hide() return end
     if not frame then build() end
     local f = frame
     f:SetScale(d.scale or 1)
 
-    -- Rauten
-    local max = math.min(d.max or 3, MAX_PIPS)
-    local width = max * 26
-    local baseA = d.estimated and 0.6 or 1
-    for i, p in ipairs(f.pips) do
-        if i > max then
-            p:Hide()
+    local count = math.min(d.count or 0, SEGMENTS)
+    local ready = d.ready
+    local r, g, b = d.r or 1, d.g or 0.6, d.b or 0.1
+    if ready then r, g, b = d.tr or r, d.tg or g, d.tb or b end
+    local base = d.estimated and 0.55 or 1
+
+    for i, seg in ipairs(f.segs) do
+        local lit = ready or i <= count
+        local maybe = not ready and d.atLeast and i == count + 1
+        if lit then
+            setSide(seg.core, r, g, b, base)
+            setSide(seg.glow, r, g, b, (ready and 0.9 or 0.35) * base)
         else
-            p:ClearAllPoints()
-            p:SetPoint("CENTER", f, "CENTER", -width / 2 + 13 + (i - 1) * 26, -112)
-            p:Show()
-            local lit = i <= (d.count or 0)
-            local maybe = d.atLeast and i == (d.count or 0) + 1
-            local r, g, b = d.r or 1, d.g or 0.8, d.b or 0.2
-            if d.ready then r, g, b = d.tr or r, d.tg or g, d.tb or b end
-            if lit or maybe then
-                p.fill:SetVertexColor(r, g, b, baseA)
-                p.glow:SetVertexColor(r, g, b, (lit and 0.45 or 0.25) * baseA)
-                p.shine:Show()
-            else
-                p.fill:SetVertexColor(0.15, 0.15, 0.15, 0.8)
-                p.glow:SetVertexColor(0, 0, 0, 0)
-                p.shine:Hide()
-            end
-            if maybe then
-                if not p.flicker:IsPlaying() then p.flicker:Play() end
-            else
-                p.flicker:Stop()
-                p:SetAlpha(1)
-            end
+            setSide(seg.core, r, g, b, 0)
+            setSide(seg.glow, r, g, b, 0)
+        end
+        for side = 1, 2 do seg.flash[side]:SetVertexColor(r, g, b, 1) end
+        -- neues Segment: kurz aufblitzen
+        if lit and not ready and i > f.lastCount and i <= count then
+            seg.flicker:Stop()
+            seg.flashAnim:Stop(); seg.flashAnim:Play()
+        elseif maybe then
+            if not seg.flicker:IsPlaying() then seg.flashAnim:Stop(); seg.flicker:Play() end
+        elseif seg.flicker:IsPlaying() then
+            seg.flicker:Stop(); seg.flashHolder:SetAlpha(0)
         end
     end
-
-    -- Bögen: werden mit jedem Stapel kräftiger, bei "jetzt" volle Farbe und pulsierend
-    local fillPct = (d.count or 0) / math.max(1, max)
-    local r, g, b = d.r or 1, d.g or 0.8, d.b or 0.2
-    local a
-    if d.ready then
-        r, g, b, a = d.tr or r, d.tg or g, d.tb or b, 1
-        if not f.arcPulse:IsPlaying() then f.arcPulse:Play() end
-    else
-        a = fillPct > 0 and (0.12 + 0.38 * fillPct) or 0
-        f.arcPulse:Stop()
-        f.arcs:SetAlpha(1)
+    -- Wechsel fällig: alles pulsiert in der Zielfarbe (beim Umschalten einmal aufblitzen)
+    if ready then
+        if not f.glowPulse:IsPlaying() then
+            for _, seg in ipairs(f.segs) do seg.flashAnim:Stop(); seg.flashAnim:Play() end
+            f.glowPulse:Play(); f.corePulse:Play()
+        end
+    elseif f.glowPulse:IsPlaying() then
+        f.glowPulse:Stop(); f.corePulse:Stop()
+        f.glowLayer:SetAlpha(1); f.coreLayer:SetAlpha(1)
     end
-    f.left:SetVertexColor(r, g, b, a)
-    f.right:SetVertexColor(r, g, b, a)
-
-    -- Symbol des Zielzaubers
-    if d.ready and d.spell then
-        local sp = ns.spells and ns.spells[d.spell]
-        local id = (sp and sp.id) or ns.SPELL_IDS[d.spell]
-        local tex = (sp and sp.icon) or (id and ns.safe(C_Spell.GetSpellTexture, id))
-        f.icon.tex:SetTexture(tex or 134400)
-        f.icon.ring:SetVertexColor(d.tr or 1, d.tg or 1, d.tb or 1, 0.9)
-        if not f.icon:IsShown() then f.icon:Show(); f.icon.pulse:Play() end
-    elseif f.icon:IsShown() then
-        f.icon.pulse:Stop()
-        f.icon:Hide()
-    end
+    f.lastCount = ready and SEGMENTS or count
     f:Show()
 end
