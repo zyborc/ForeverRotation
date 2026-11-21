@@ -5,7 +5,7 @@
 ## Author: Alex (zyborc)
 ## X-Website: https://github.com/zyborc/ForeverRotation
 ## X-License: MIT
-## Version: 0.18.1
+## Version: 0.18.2
 ## SavedVariables: ForeverRotationDB
 ## IconTexture: Interface\Icons\Spell_Holy_HolyBolt
 ## AddonCompartmentFunc: ForeverRotation_OnCompartmentClick

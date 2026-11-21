@@ -37,8 +37,10 @@ local STYLES = {
                 { file = "echo_arch_p2" } } },
             { min = 3, parts = {
                 { file = "echo_arch_g3", color = "seal", alpha = 0.3, add = true },
-                { file = "echo_arch_p3" },
-                { file = "echo_arch_glow", color = "target", alpha = 0.35, add = true } } },
+                { file = "echo_arch_p3" } } },
+            -- Wechselsignal hinter dem Bogen (sonst mischt sich z. B. Blau über Rot zu Rosa)
+            { min = 3, behind = true, parts = {
+                { file = "echo_arch_glow", color = "target", alpha = 0.5, add = true } } },
         },
     },
     custom = {   -- eigene Grafik aus ForeverRotation/Custom/ (tools/echo_custom.py), nicht im Repo
@@ -54,8 +56,10 @@ local STYLES = {
                 { file = "echo_custom_p2" } } },
             { min = 3, parts = {
                 { file = "echo_custom_g3", color = "seal", alpha = 0.3, add = true },
-                { file = "echo_custom_p3" },
-                { file = "echo_custom_glow", color = "target", alpha = 0.35, add = true } } },
+                { file = "echo_custom_p3" } } },
+            -- Wechselsignal hinter dem Bogen (sonst mischt sich z. B. Blau über Rot zu Rosa)
+            { min = 3, behind = true, parts = {
+                { file = "echo_custom_glow", color = "target", alpha = 0.5, add = true } } },
         },
     },
     arcs = {
@@ -167,6 +171,9 @@ local function initStage(button, e, st, container, stage)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
     button:SetSize(st.w, st.h)
+    -- Reihenfolge der Ebenen: Schein "dahinter" ganz unten, dann die Stufen der Reihe nach
+    local base = container:GetFrameLevel()
+    button:SetFrameLevel(stage.behind and base + 1 or base + 2 + (stage.min or 1))
     local bar = CreateFrame("StatusBar", nil, button)
     bar:SetAllPoints(button)
     bar:SetStatusBarTexture(WHITE)
