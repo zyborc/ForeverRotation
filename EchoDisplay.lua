@@ -14,7 +14,7 @@ local Echo = {}
 ns.EchoDisplay = Echo
 
 local TEX = "Interface\\AddOns\\ForeverRotation\\Textures\\"
-local STRATA = "WORLD"     -- unterste Ebene, unter den Namensplaketten
+local STRATA = "BACKGROUND"   -- unterste Ebene für Addons ("WORLD" setzt das Spiel still auf MEDIUM)
 local CUSTOM = "Interface\\AddOns\\ForeverRotation\\Custom\\"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
@@ -177,7 +177,7 @@ local function initStage(button, e, st, container, stage)
     button:SetFrameStrata(STRATA)
     -- Reihenfolge der Ebenen: Schein "dahinter" ganz unten, dann die Stufen der Reihe nach
     local base = container:GetFrameLevel()
-    button:SetFrameLevel(stage.behind and base + 1 or base + 2 + (stage.min or 1))
+    button:SetFrameLevel(stage.behind and base or base + (stage.min or 1))
     local bar = CreateFrame("StatusBar", nil, button)
     bar:SetAllPoints(button)
     bar:SetStatusBarTexture(WHITE)
@@ -255,8 +255,7 @@ local function build(key, styleKey, mode, custom)
     info.frame = c
     c:SetSize(st.w, st.h)
     c:SetPoint("CENTER", WorldFrame, "CENTER", st.x, st.y)
-    -- "WORLD" ist die unterste Ebene (direkt über der Spielwelt): Namensplaketten und Lebensleisten
-    -- liegen in "BACKGROUND" oder höher und damit sicher über der Anzeige.
+    -- unterste erlaubte Ebene, Stufen so niedrig wie möglich (Namensplaketten sollen darüber liegen)
     c:SetFrameStrata(STRATA)
     c:SetFrameLevel(0)
     c:EnableMouse(false)
@@ -363,7 +362,7 @@ function Echo:LayerText()
     local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and ns.safe(C_NamePlate.GetNamePlateForUnit, "target")
     local uf = plate and (plate.UnitFrame or plate)
     local hb = uf and (uf.healthBar or (uf.HealthBarsContainer and uf.HealthBarsContainer.healthBar))
-    return string.format("Anzeige %s, Slot %s | Ziel-Plakette %s, UnitFrame %s, Leiste %s",
+    return string.format("Anzeige %s\n  Slot %s\n  Plakette %s\n  UnitFrame %s\n  Leiste %s",
         mine, slot and frameInfo(slot) or "-", plate and frameInfo(plate) or "keine", uf and frameInfo(uf) or "-",
         hb and frameInfo(hb) or "-")
 end
