@@ -362,9 +362,12 @@ function Echo:LayerText()
     local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and ns.safe(C_NamePlate.GetNamePlateForUnit, "target")
     local uf = plate and (plate.UnitFrame or plate)
     local hb = uf and (uf.healthBar or (uf.HealthBarsContainer and uf.HealthBarsContainer.healthBar))
-    return string.format("Anzeige %s\n  Slot %s\n  Plakette %s\n  UnitFrame %s\n  Leiste %s",
+    local text = string.format("Anzeige %s\n  Slot %s\n  Plakette %s\n  UnitFrame %s\n  Leiste %s",
         mine, slot and frameInfo(slot) or "-", plate and frameInfo(plate) or "keine", uf and frameInfo(uf) or "-",
         hb and frameInfo(hb) or "-")
+    -- auch in die gespeicherten Daten (nach /reload in der Datei lesbar)
+    if ns.db then ns.db.global.layerDebug = date("%Y-%m-%d %H:%M:%S") .. " " .. text end
+    return text
 end
 
 -- Zeile für /frot state
