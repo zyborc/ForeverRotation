@@ -1499,6 +1499,8 @@ local function printState()
     if s.form then print(L["  Gestalt/Haltung: "] .. ns:SpellName(s.form)) end
     if ns.EchoDisplay and ns.rotation.id == "PALADIN_RETRIBUTION" then
         print(string.format(L["  Echo-Anzeige: %s"], ns.EchoDisplay:StatusText()))
+        local okL, layer = pcall(ns.EchoDisplay.LayerText, ns.EchoDisplay)
+        print("  " .. (okL and layer or ("Ebenen: Fehler " .. tostring(layer))))
     end
     if ns.CDM then
         local c = ns.CDM.cdCheck

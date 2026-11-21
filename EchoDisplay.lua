@@ -346,6 +346,28 @@ function Echo:Refresh()
     end
 end
 
+-- Ebenen-Diagnose (für /frot state): wo liegt die Anzeige, wo die Namensplakette des Ziels?
+local function frameInfo(f)
+    if not f then return "-" end
+    local okP, parent = pcall(f.GetParent, f)
+    local pname = okP and parent and (parent.GetName and parent:GetName() or "?") or "nil"
+    local okS, strata = pcall(f.GetFrameStrata, f)
+    local okL, level = pcall(f.GetFrameLevel, f)
+    return string.format("%s|%s|%s", tostring(pname), okS and tostring(strata) or "?", okL and tostring(level) or "?")
+end
+
+function Echo:LayerText()
+    local info = active and containers[active]
+    local mine = info and info.frame and frameInfo(info.frame) or "-"
+    local slot = info and info.frame and info.frame.GetAuraSlotFrame and info.frame:GetAuraSlotFrame("t1_1311703")
+    local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and ns.safe(C_NamePlate.GetNamePlateForUnit, "target")
+    local uf = plate and (plate.UnitFrame or plate)
+    local hb = uf and (uf.healthBar or (uf.HealthBarsContainer and uf.HealthBarsContainer.healthBar))
+    return string.format("Anzeige %s, Slot %s | Ziel-Plakette %s, UnitFrame %s, Leiste %s",
+        mine, slot and frameInfo(slot) or "-", plate and frameInfo(plate) or "keine", uf and frameInfo(uf) or "-",
+        hb and frameInfo(hb) or "-")
+end
+
 -- Zeile für /frot state
 function Echo:StatusText()
     local style, key = wantedStyle()
