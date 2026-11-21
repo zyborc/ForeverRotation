@@ -30,13 +30,13 @@ local STYLES = {
             { min = 1, parts = {
                 { file = "echo_arch_p1", alpha = 0.25 }, { file = "echo_arch_p2", alpha = 0.25 },
                 { file = "echo_arch_p3", alpha = 0.25 },
-                { file = "echo_arch_g1", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_g1", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_arch_p1" } } },
             { min = 2, parts = {
-                { file = "echo_arch_g2", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_g2", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_arch_p2" } } },
             { min = 3, parts = {
-                { file = "echo_arch_g3", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_arch_g3", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_arch_p3" },
                 { file = "echo_arch_glow", color = "target", alpha = 0.35, add = true } } },
         },
@@ -47,13 +47,13 @@ local STYLES = {
             { min = 1, parts = {
                 { file = "echo_custom_p1", alpha = 0.25 }, { file = "echo_custom_p2", alpha = 0.25 },
                 { file = "echo_custom_p3", alpha = 0.25 },
-                { file = "echo_custom_g1", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_g1", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_custom_p1" } } },
             { min = 2, parts = {
-                { file = "echo_custom_g2", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_g2", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_custom_p2" } } },
             { min = 3, parts = {
-                { file = "echo_custom_g3", color = "seal", alpha = 0.5, add = true },
+                { file = "echo_custom_g3", color = "seal", alpha = 0.3, add = true },
                 { file = "echo_custom_p3" },
                 { file = "echo_custom_glow", color = "target", alpha = 0.35, add = true } } },
         },
