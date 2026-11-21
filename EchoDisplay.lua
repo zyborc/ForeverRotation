@@ -72,7 +72,7 @@ local STYLES = {
 
 -- Kopie-Auren von Unsealed Wrath je Siegel: Farbe der Füllung, Farbe des Leuchtens bei 3
 -- (beim Twisten = Farbe des Siegels, auf das gewechselt wird)
-local ORANGE, BLUE, GOLD = { 1.00, 0.12, 0.06 }, { 0.35, 0.75, 1.00 }, { 1.00, 0.85, 0.30 }   -- ORANGE: Rot-Orange (Command)
+local ORANGE, BLUE, GOLD = { 1.00, 0.17, 0.09 }, { 0.35, 0.75, 1.00 }, { 1.00, 0.85, 0.30 }   -- ORANGE: Rot-Orange (Command)
 local ECHOES = {
     { id = 1311703, color = ORANGE,                  full = BLUE },   -- Echo of Command
     { id = 1311704, color = BLUE,                    full = ORANGE }, -- Echo of Righteousness
@@ -186,7 +186,8 @@ local function initStage(button, e, st, container, stage)
             h:SetTexture((st.dir or TEX) .. part.file .. "h")
             h:SetAllPoints(button)
             h:SetBlendMode("ADD")
-            h:SetVertexColor(c[1], c[2], c[3], 0.7 * (part.alpha or 1))
+            local w = 0.18   -- Kanten leicht aufgehellt (Abstufung "mittel")
+            h:SetVertexColor(c[1] + (1 - c[1]) * w, c[2] + (1 - c[2]) * w, c[3] + (1 - c[3]) * w, 0.55 * (part.alpha or 1))
         end
         t:SetTexture((st.dir or TEX) .. file)
         t:SetAllPoints(button)
