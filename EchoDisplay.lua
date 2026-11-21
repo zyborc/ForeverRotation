@@ -72,7 +72,7 @@ local STYLES = {
 
 -- Kopie-Auren von Unsealed Wrath je Siegel: Farbe der Füllung, Farbe des Leuchtens bei 3
 -- (beim Twisten = Farbe des Siegels, auf das gewechselt wird)
-local ORANGE, BLUE, GOLD = { 1.00, 0.25, 0.12 }, { 0.35, 0.75, 1.00 }, { 1.00, 0.85, 0.30 }   -- ORANGE: Rot-Orange (Command)
+local ORANGE, BLUE, GOLD = { 1.00, 0.12, 0.06 }, { 0.35, 0.75, 1.00 }, { 1.00, 0.85, 0.30 }   -- ORANGE: Rot-Orange (Command)
 local ECHOES = {
     { id = 1311703, color = ORANGE,                  full = BLUE },   -- Echo of Command
     { id = 1311704, color = BLUE,                    full = ORANGE }, -- Echo of Righteousness
@@ -180,12 +180,13 @@ local function initStage(button, e, st, container, stage)
             c = e.full
         elseif cur.mode ~= "gold" and st.tintable then
             file, c = file .. "w", sealColor(e)      -- farblose Fassung, im Spiel eingefärbt
-            -- Lichtkanten (hellste Stellen, weiß) darüber: wirkt so scharf wie die Originalfarben
+            -- Lichtkanten (hellste Stellen) in derselben Farbe addiert: Konturen leuchten kräftiger,
+            -- ohne die Farbe auszuwaschen (weiße Kanten machten z. B. Rot rosa)
             local h = bar:CreateTexture(nil, "OVERLAY", nil, math.min(7, i - 1))
             h:SetTexture((st.dir or TEX) .. part.file .. "h")
             h:SetAllPoints(button)
             h:SetBlendMode("ADD")
-            h:SetVertexColor(1, 1, 1, 0.45 * (part.alpha or 1))
+            h:SetVertexColor(c[1], c[2], c[3], 0.7 * (part.alpha or 1))
         end
         t:SetTexture((st.dir or TEX) .. file)
         t:SetAllPoints(button)
