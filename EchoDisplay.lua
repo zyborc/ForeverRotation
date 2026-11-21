@@ -30,16 +30,16 @@ local STYLES = {
             { min = 1, parts = {
                 { file = "echo_arch_p1", alpha = 0.25 }, { file = "echo_arch_p2", alpha = 0.25 },
                 { file = "echo_arch_p3", alpha = 0.25 },
-                { file = "echo_arch_g1", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_arch_g1", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_arch_p1" } } },
             { min = 2, parts = {
-                { file = "echo_arch_g2", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_arch_g2", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_arch_p2" } } },
             { min = 3, parts = {
-                { file = "echo_arch_g3", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_arch_g3", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_arch_p3" } } },
-            -- Wechselsignal hinter dem Bogen (sonst mischt sich z. B. Blau über Rot zu Rosa)
-            { min = 3, behind = true, parts = {
+            -- Wechselsignal hinter dem Bogen, nur mit Option "Leuchten bei 3 Kopien"
+            { min = 3, behind = true, optional = "echoFxFullGlow", parts = {
                 { file = "echo_arch_glow", color = "target", alpha = 0.5, add = true } } },
         },
     },
@@ -49,16 +49,16 @@ local STYLES = {
             { min = 1, parts = {
                 { file = "echo_custom_p1", alpha = 0.25 }, { file = "echo_custom_p2", alpha = 0.25 },
                 { file = "echo_custom_p3", alpha = 0.25 },
-                { file = "echo_custom_g1", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_custom_g1", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_custom_p1" } } },
             { min = 2, parts = {
-                { file = "echo_custom_g2", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_custom_g2", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_custom_p2" } } },
             { min = 3, parts = {
-                { file = "echo_custom_g3", color = "seal", alpha = 0.3, add = true },
+                { file = "echo_custom_g3", color = "seal", alpha = 0.18, add = true },
                 { file = "echo_custom_p3" } } },
-            -- Wechselsignal hinter dem Bogen (sonst mischt sich z. B. Blau über Rot zu Rosa)
-            { min = 3, behind = true, parts = {
+            -- Wechselsignal hinter dem Bogen, nur mit Option "Leuchten bei 3 Kopien"
+            { min = 3, behind = true, optional = "echoFxFullGlow", parts = {
                 { file = "echo_custom_glow", color = "target", alpha = 0.5, add = true } } },
         },
     },
@@ -99,6 +99,7 @@ local function colorSetting()
     local c = ns:Opt("echoFxCustom")
     local custom = type(c) == "table" and { c.r or c[1] or 1, c.g or c[2] or 1, c.b or c[3] or 1 } or { 1, 0.85, 0.3 }
     local key = mode == "custom" and string.format("custom:%.2f,%.2f,%.2f", custom[1], custom[2], custom[3]) or mode
+    if ns:Opt("echoFxFullGlow") then key = key .. "+glow" end
     return mode, custom, key
 end
 
@@ -277,7 +278,11 @@ local function build(key, styleKey, mode, custom)
     end
     for _, e in ipairs(ECHOES) do
         if st.stages then
-            for i, stage in ipairs(st.stages) do addSlot("t" .. i .. "_" .. e.id, e.id, initStage, e, stage) end
+            for i, stage in ipairs(st.stages) do
+                if not stage.optional or ns:Opt(stage.optional) then
+                    addSlot("t" .. i .. "_" .. e.id, e.id, initStage, e, stage)
+                end
+            end
         else
             addSlot("s" .. e.id, e.id, initStacks, e)
             addSlot("f" .. e.id, e.id, initFull, e)

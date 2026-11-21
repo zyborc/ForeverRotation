@@ -243,6 +243,8 @@ add({
     ["eigene Farbe"] = "custom color",
     ["Standard = Originalfarben der Grafik mit Schimmer in Siegelfarbe, Siegelfarbe = ganz in der Farbe des Siegels ({Seal of Command} orange, {Seal of Righteousness} blau), eigene Farbe = Farbe unten wählen."] = "Default = original colors of the graphic with a shimmer in seal color, Seal color = entirely in the seal's color ({Seal of Command} orange, {Seal of Righteousness} blue), custom color = pick a color below.",
     ["Eigene Farbe der Echo-Anzeige"] = "Echo display custom color",
+    ["Echo-Bogen: Leuchten bei 3 Kopien"] = "Echo arch: glow at 3 copies",
+    ["Zusätzlicher Schein in der Farbe des Siegels, auf das du wechseln solltest, sobald 3 Kopien liegen. Ohne leuchten bei 3 einfach alle drei Teile gleichmäßig."] = "Extra glow in the color of the seal you should switch to once 3 copies are stored. Without it, all three parts simply light up evenly at 3.",
     ["Gilt bei Farbe „eigene Farbe“."] = "Applies when color is “custom color”.",
     ["Verschiebt die Anzeige nach oben (+) oder unten (−)."] = "Moves the display up (+) or down (−).",
     ["Klinge des Lichts"] = "Blade of Light",

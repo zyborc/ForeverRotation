@@ -364,6 +364,8 @@ ns:RegisterRotation({
                         values = { "gold", "seal", "custom" },
                         valueLabels = { gold = "Standard", seal = "Siegelfarbe", custom = "eigene Farbe" },
                         desc = "Standard = Originalfarben der Grafik mit Schimmer in Siegelfarbe, Siegelfarbe = ganz in der Farbe des Siegels ({Seal of Command} orange, {Seal of Righteousness} blau), eigene Farbe = Farbe unten wählen." },
+        echoFxFullGlow = { order = 13, default = false, label = "Echo-Bogen: Leuchten bei 3 Kopien",
+                           desc = "Zusätzlicher Schein in der Farbe des Siegels, auf das du wechseln solltest, sobald 3 Kopien liegen. Ohne leuchten bei 3 einfach alle drei Teile gleichmäßig." },
         echoFxCustom = { order = 12, color = true, default = { r = 1, g = 0.85, b = 0.3 }, label = "Eigene Farbe der Echo-Anzeige",
                          desc = "Gilt bei Farbe „eigene Farbe“." },
     }),
