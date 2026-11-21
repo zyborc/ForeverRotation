@@ -14,6 +14,7 @@ local Echo = {}
 ns.EchoDisplay = Echo
 
 local TEX = "Interface\\AddOns\\ForeverRotation\\Textures\\"
+local STRATA = "WORLD"     -- unterste Ebene, unter den Namensplaketten
 local CUSTOM = "Interface\\AddOns\\ForeverRotation\\Custom\\"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
@@ -125,6 +126,7 @@ local function initStacks(button, e, st, container)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
     button:SetSize(st.w, st.h)
+    button:SetFrameStrata(STRATA)
     local sc = sealColor(e)
     local r, g, b = sc[1], sc[2], sc[3]
     local fx, fy = st.w / st.tw, st.h / st.th
@@ -172,6 +174,7 @@ local function initStage(button, e, st, container, stage)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
     button:SetSize(st.w, st.h)
+    button:SetFrameStrata(STRATA)
     -- Reihenfolge der Ebenen: Schein "dahinter" ganz unten, dann die Stufen der Reihe nach
     local base = container:GetFrameLevel()
     button:SetFrameLevel(stage.behind and base + 1 or base + 2 + (stage.min or 1))
@@ -215,6 +218,7 @@ local function initFull(button, e, st, container)
     button:ClearAllPoints()
     button:SetPoint("CENTER", container, "CENTER")
     button:SetSize(st.w, st.h)
+    button:SetFrameStrata(STRATA)
     local bar = CreateFrame("StatusBar", nil, button)
     bar:SetAllPoints(button)
     bar:SetStatusBarTexture(WHITE)
@@ -251,7 +255,9 @@ local function build(key, styleKey, mode, custom)
     info.frame = c
     c:SetSize(st.w, st.h)
     c:SetPoint("CENTER", WorldFrame, "CENTER", st.x, st.y)
-    c:SetFrameStrata("BACKGROUND")
+    -- "WORLD" ist die unterste Ebene (direkt über der Spielwelt): Namensplaketten und Lebensleisten
+    -- liegen in "BACKGROUND" oder höher und damit sicher über der Anzeige.
+    c:SetFrameStrata(STRATA)
     c:SetFrameLevel(0)
     c:EnableMouse(false)
     c:Hide()
