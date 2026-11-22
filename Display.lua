@@ -504,8 +504,8 @@ function Display:ApplySettings()
     end
     self.inInstance = ns:InInstance()
     f:SetScale((g.scale or 1) * (self.inInstance and (g.instanceScale or 1) or 1))
-    f:EnableMouse(not g.locked)
-    f.handle:SetShown(not g.locked)
+    f:EnableMouse(not ns:Locked())
+    f.handle:SetShown(not ns:Locked())
 
     -- Timeline: in der Zeile rechts neben dem großen Icon (Zauber gleiten hinein)
     -- oder darunter (dann mit Jetzt-Linie und zusätzlichem "danach"-Icon).
@@ -531,7 +531,7 @@ function Display:ApplySettings()
     else
         f.unlockBg:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 10, -24)
     end
-    f.unlockBg:SetShown(not g.locked)
+    f.unlockBg:SetShown(not ns:Locked())
 
     local masque = self:MasqueActive()
     local round = g.shape ~= "square" and not masque
@@ -736,7 +736,7 @@ end
 
 function Display:ShouldShow(s)
     local g = ns.db.global
-    if not g.locked or self:PreviewActive() then return true end
+    if not ns:Locked() or self:PreviewActive() then return true end
     if g.hideMounted and ns.safe(IsMounted) then return false end
     if g.hideVehicle and (ns.safe(UnitHasVehicleUI, "player") or ns.safe(UnitInVehicle, "player")) then return false end
     if ns.safe(UnitIsDeadOrGhost, "player") then return false end
@@ -778,7 +778,7 @@ function Display:UpdateReminders(s)
     if f.remindNext and now < f.remindNext then return end
     f.remindNext = now + 1
     local lines = {}
-    if not s.inCombat and g.locked and not (g.hideMounted and ns.safe(IsMounted)) then
+    if not s.inCombat and ns:Locked() and not (g.hideMounted and ns.safe(IsMounted)) then
         if wantReminder(g.remindFood) and not hasFoodBuff() then
             lines[#lines + 1] = "|T133943:14|t " .. L["Kein Essen-Buff"]
         end
@@ -812,7 +812,7 @@ function Display:Update()
         if ns.ActionGlow then ns.ActionGlow:Update(nil) end
         return
     end
-    f:SetAlpha((s.inCombat or not g.locked or preview) and 1 or (g.alphaOOC or 0.6))
+    f:SetAlpha((s.inCombat or not ns:Locked() or preview) and 1 or (g.alphaOOC or 0.6))
 
     local rule, ready, noMana = ns:Recommend(s)
 
@@ -845,7 +845,7 @@ function Display:Update()
     end
     setIcon(f.next, nextRule, nextReady, nextNoMana, s, false)
 
-    if not g.locked or preview then
+    if not ns:Locked() or preview then
         if not rule then showPreview(f.main, L["jetzt"]) end
         if wantNext and not nextRule then showPreview(f.next, L["dann"]) end
     end
@@ -855,7 +855,7 @@ function Display:Update()
         reason = (g.showReason and idleMode == "auto") and L["Autoangriff"] or ""
     else
         reason = (g.showReason and rule and rule.reason and ns:T(rule.reason, rule.spell)) or ""
-        if reason == "" and g.showReason and not rule and (not g.locked or preview) then
+        if reason == "" and g.showReason and not rule and (not ns:Locked() or preview) then
             reason = L["Begründung erscheint hier"]
         end
     end
@@ -870,3 +870,39 @@ function Display:Update()
         f.timeline:Hide()
     end
 end
+
+---------------------------------------------------------------------------
+-- Bearbeitungsmodus (Edit Mode): solange er offen ist, sind alle Anzeigen von
+-- ForeverRotation verschiebbar (Hauptanzeige, Echo-Anzeige). Gespeichert wird bei uns.
+---------------------------------------------------------------------------
+
+-- Fixiert? Nein, wenn per /frot unlock entsperrt oder der Bearbeitungsmodus offen ist.
+function ns:Locked()
+    return ns.db and ns.db.global.locked and not ns.editModeActive
+end
+
+local function setEditMode(on)
+    if ns.editModeActive == on then return end
+    ns.editModeActive = on
+    if ns.Display and ns.Display.frame then ns.Display:ApplySettings() end
+    if ns.EchoDisplay then ns.EchoDisplay:Refresh() end
+end
+
+local emHooked = false
+local function hookEditMode()
+    if EventRegistry and EventRegistry.RegisterCallback and not ns.emRegistered then
+        ns.emRegistered = true
+        EventRegistry:RegisterCallback("EditMode.Enter", function() setEditMode(true) end, ns)
+        EventRegistry:RegisterCallback("EditMode.Exit", function() setEditMode(false) end, ns)
+    end
+    if not emHooked and EditModeManagerFrame and EditModeManagerFrame.HookScript then
+        emHooked = true
+        EditModeManagerFrame:HookScript("OnShow", function() setEditMode(true) end)
+        EditModeManagerFrame:HookScript("OnHide", function() setEditMode(false) end)
+    end
+end
+
+local emEv = CreateFrame("Frame")
+emEv:RegisterEvent("PLAYER_LOGIN")
+emEv:RegisterEvent("ADDON_LOADED")
+emEv:SetScript("OnEvent", function() hookEditMode() end)

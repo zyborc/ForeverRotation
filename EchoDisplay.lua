@@ -314,6 +314,81 @@ local function setShown(styleKey, on)
     end
 end
 
+-- Zieh-Rahmen (auf der Oberfläche): sichtbar, wenn ForeverRotation entsperrt oder der Bearbeitungsmodus
+-- offen ist. Zeigt die Grafik blass als Vorschau; Loslassen speichert die Verschiebung (echoFxX/echoFxY).
+local mover
+
+local function moverPreview(st)
+    local list = {}
+    if st.stages then
+        for i = 1, 3 do list[#list + 1] = (st.dir or TEX) .. st.stages[1].parts[i].file end
+    elseif st.base then
+        list[1] = TEX .. st.base
+    end
+    return list
+end
+
+local function getMover()
+    if mover then return mover end
+    local m = CreateFrame("Frame", nil, UIParent)
+    m:SetFrameStrata("DIALOG")
+    m:SetMovable(true)
+    m:EnableMouse(true)
+    m:RegisterForDrag("LeftButton")
+    m:SetClampedToScreen(true)
+    m.bg = m:CreateTexture(nil, "BACKGROUND")
+    m.bg:SetAllPoints()
+    m.bg:SetColorTexture(0.1, 0.8, 0.3, 0.18)
+    m.pics = {}
+    for i = 1, 3 do
+        local t = m:CreateTexture(nil, "ARTWORK")
+        t:SetAllPoints()
+        t:SetAlpha(0.55)
+        m.pics[i] = t
+    end
+    m.label = m:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    m.label:SetPoint("BOTTOM", m, "TOP", 0, 2)
+    m.label:SetText(ns.L["Echo-Anzeige – mit der Maus ziehen"])
+    m:SetScript("OnDragStart", function(f) f:StartMoving() end)
+    m:SetScript("OnDragStop", function(f)
+        f:StopMovingOrSizing()
+        local st = f.style and STYLES[f.style]
+        if not st then return end
+        local cx, cy = f:GetCenter()
+        local ux, uy = UIParent:GetCenter()
+        ns:SetOpt("echoFxX", math.floor(cx - ux - st.x + 0.5))
+        ns:SetOpt("echoFxY", math.floor(cy - uy - st.y + 0.5))
+        Echo:Refresh()
+    end)
+    mover = m
+    return m
+end
+
+local function updateMover(styleKey)
+    local show = styleKey and not ns:Locked()
+    if not show then
+        if mover then mover:Hide() end
+        return
+    end
+    local st = STYLES[styleKey]
+    local m = getMover()
+    if m.style ~= styleKey then
+        m.style = styleKey
+        local pics = moverPreview(st)
+        for i, t in ipairs(m.pics) do
+            t:SetTexture(pics[i])
+            t:SetShown(pics[i] ~= nil)
+        end
+    end
+    local scale = ns:Opt("echoFxScale") or 1
+    m:SetSize(st.w * scale, st.h * scale)
+    if not m:IsDragging() then
+        m:ClearAllPoints()
+        m:SetPoint("CENTER", UIParent, "CENTER", st.x + (ns:Opt("echoFxX") or 0), st.y + (ns:Opt("echoFxY") or 0))
+    end
+    m:Show()
+end
+
 function Echo:Refresh()
     local style, want, mode, custom = wantedStyle()
     if want and not containers[want] then
@@ -330,17 +405,22 @@ function Echo:Refresh()
         local scale = ns:Opt("echoFxScale") or 1
         local uiFactor = UIParent:GetEffectiveScale() / math.max(0.01, WorldFrame:GetEffectiveScale())
         local total = scale * uiFactor
-        if math.abs(info.frame:GetScale() - total) > 0.001 then info.frame:SetScale(total) end
+        if math.abs(info.frame:GetScale() - total) > 0.001 then pcall(info.frame.SetScale, info.frame, total) end
         local alpha = ns:Opt("echoFxAlpha") or 1
-        if math.abs(info.frame:GetAlpha() - alpha) > 0.001 then info.frame:SetAlpha(alpha) end
+        if math.abs(info.frame:GetAlpha() - alpha) > 0.001 then pcall(info.frame.SetAlpha, info.frame, alpha) end
         local st = STYLES[info.style]
+        -- Versatz in Oberflächen-Einheiten, im Rahmen durch die eigene Größe geteilt
+        local x = (st.x + (ns:Opt("echoFxX") or 0)) / scale
         local y = (st.y + (ns:Opt("echoFxY") or 0)) / scale
-        if info.y ~= y then
-            info.y = y
-            info.frame:ClearAllPoints()
-            info.frame:SetPoint("CENTER", WorldFrame, "CENTER", st.x / scale, y)
+        if info.x ~= x or info.y ~= y then
+            info.x, info.y = x, y
+            pcall(function()
+                info.frame:ClearAllPoints()
+                info.frame:SetPoint("CENTER", WorldFrame, "CENTER", x, y)
+            end)
         end
     end
+    updateMover(info and info.frame and info.style or nil)
 end
 
 -- Ebenen-Diagnose (für /frot state): wo liegt die Anzeige, wo die Namensplakette des Ziels?
