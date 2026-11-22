@@ -52,6 +52,9 @@ local STYLES = {
     banner = {   -- Ashbringer-Banner: linkes Banner / Ashbringer mit Schulterstücken / rechtes Banner
         w = 460, h = 230, x = 0, y = 110, tintable = true, stages = thirds("echo_banner"),
     },
+    archbanner = {   -- Ashbringer-Bogen: wie das Banner, als Bogen über dem Kopf
+        w = 440, h = 220, x = 0, y = 100, tintable = true, stages = thirds("echo_archbanner"),
+    },
     swords = {   -- Ashbringer links und rechts vom Charakter: Griff / Klinge / Spitze
         w = 512, h = 256, x = 0, y = -10, tintable = true, stages = thirds("echo_swords"),
     },
