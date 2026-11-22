@@ -24,44 +24,39 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 --   glow     Schein bei 3 Kopien
 -- Stufen-Stile (stages): je Stufe ein Slot, den das Spiel erst ab `min` Stapeln zeigt. Teile:
 --   file, color ("seal" = Siegelfarbe, "target" = Zielfarbe, nil = Originalfarben), alpha, add (ADD-Mischung)
+-- Drei-Teile-Stil aus Bildern (tools/echo_custom.py bzw. tools/echo_assets.py): je Stufe ein Teil,
+-- ab 1 Kopie alle Teile schwach angedeutet, Schein in Zielfarbe bei 3 nur mit Option.
+local function thirds(prefix)
+    return {
+        { min = 1, parts = {
+            { file = prefix .. "_p1", alpha = 0.25 }, { file = prefix .. "_p2", alpha = 0.25 },
+            { file = prefix .. "_p3", alpha = 0.25 },
+            { file = prefix .. "_g1", color = "seal", alpha = 0.18, add = true },
+            { file = prefix .. "_p1" } } },
+        { min = 2, parts = {
+            { file = prefix .. "_g2", color = "seal", alpha = 0.18, add = true },
+            { file = prefix .. "_p2" } } },
+        { min = 3, parts = {
+            { file = prefix .. "_g3", color = "seal", alpha = 0.18, add = true },
+            { file = prefix .. "_p3" } } },
+        -- Wechselsignal dahinter, nur mit Option "Leuchten bei 3 Kopien"
+        { min = 3, behind = true, optional = "echoFxFullGlow", parts = {
+            { file = prefix .. "_glow", color = "target", alpha = 0.5, add = true } } },
+    }
+end
+
 local STYLES = {
     arch = {     -- Echo-Bogen: linker Bogen / Hammer mit Flügeln / rechter Bogen
-        w = 400, h = 200, x = 0, y = 90, tintable = true,
-        stages = {
-            { min = 1, parts = {
-                { file = "echo_arch_p1", alpha = 0.25 }, { file = "echo_arch_p2", alpha = 0.25 },
-                { file = "echo_arch_p3", alpha = 0.25 },
-                { file = "echo_arch_g1", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_arch_p1" } } },
-            { min = 2, parts = {
-                { file = "echo_arch_g2", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_arch_p2" } } },
-            { min = 3, parts = {
-                { file = "echo_arch_g3", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_arch_p3" } } },
-            -- Wechselsignal hinter dem Bogen, nur mit Option "Leuchten bei 3 Kopien"
-            { min = 3, behind = true, optional = "echoFxFullGlow", parts = {
-                { file = "echo_arch_glow", color = "target", alpha = 0.5, add = true } } },
-        },
+        w = 400, h = 200, x = 0, y = 90, tintable = true, stages = thirds("echo_arch"),
+    },
+    banner = {   -- Ashbringer-Banner: linkes Banner / Ashbringer mit Schulterstücken / rechtes Banner
+        w = 460, h = 230, x = 0, y = 110, tintable = true, stages = thirds("echo_banner"),
+    },
+    swords = {   -- Ashbringer links und rechts vom Charakter: Griff / Klinge / Spitze
+        w = 512, h = 256, x = 0, y = -10, tintable = true, stages = thirds("echo_swords"),
     },
     custom = {   -- eigene Grafik aus ForeverRotation/Custom/ (tools/echo_custom.py), nicht im Repo
-        dir = CUSTOM, w = 400, h = 200, x = 0, y = 90, tintable = true,
-        stages = {
-            { min = 1, parts = {
-                { file = "echo_custom_p1", alpha = 0.25 }, { file = "echo_custom_p2", alpha = 0.25 },
-                { file = "echo_custom_p3", alpha = 0.25 },
-                { file = "echo_custom_g1", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_custom_p1" } } },
-            { min = 2, parts = {
-                { file = "echo_custom_g2", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_custom_p2" } } },
-            { min = 3, parts = {
-                { file = "echo_custom_g3", color = "seal", alpha = 0.18, add = true },
-                { file = "echo_custom_p3" } } },
-            -- Wechselsignal hinter dem Bogen, nur mit Option "Leuchten bei 3 Kopien"
-            { min = 3, behind = true, optional = "echoFxFullGlow", parts = {
-                { file = "echo_custom_glow", color = "target", alpha = 0.5, add = true } } },
-        },
+        dir = CUSTOM, w = 400, h = 200, x = 0, y = 90, tintable = true, stages = thirds("echo_custom"),
     },
     arcs = {
         tw = 512, th = 256, w = 512, h = 256, x = 0, y = -10,
